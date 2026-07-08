@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SwapIQ - keep the sale when stock runs out</title>
+<meta name="description" content="Knowledge graph substitution intelligence for grocery ecommerce. Provably safe substitutes, explained by AI, learning from every tap.">
+<style>
+  :root {
+    --ink: #1B1F2E; --soft: #5D6374; --faint: #8A8FA3;
+    --line: #E5E6EF; --ground: #F7F7FA; --card: #FFFFFF;
+    --accent: #5A4FB5; --accent-dark: #473DA0; --accent-bg: #EFEDF9;
+    --green: #177A42; --green-bg: #E7F4EC;
+    --red: #B3403A; --red-bg: #FAECEB;
+    --amber: #9A5B10; --amber-bg: #FBF0DD;
+    --mono: "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--ground); color: var(--ink);
+    font-size: 15px; line-height: 1.55;
+  }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ---- header ---- */
+  header { background: var(--card); border-bottom: 1px solid var(--line); }
+  .head-inner {
+    max-width: 1140px; margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  }
+  .wordmark { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+  .tagline { color: var(--soft); font-size: 13.5px; flex: 1; min-width: 200px; }
+  .session-stats { display: flex; gap: 22px; align-items: center; }
+  .sstat { text-align: right; }
+  .sstat .v { font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .sstat .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); }
+  .status-dot { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--green); }
+  .status-dot i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; }
+  .status-dot.fallback { color: var(--amber); }
+  .status-dot.fallback i { background: var(--amber); }
+
+  /* ---- impact strip (appears after decisions) ---- */
+  #impactStrip {
+    max-width: 1140px; margin: 14px auto 0; padding: 0 24px; display: none;
+  }
+  #impactStrip.show { display: block; }
+  .strip-card {
+    background: var(--accent-bg); border: 1px solid #DDD9F2; border-radius: 10px;
+    padding: 10px 18px; font-size: 13.5px; color: var(--accent-dark);
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .strip-card b { font-variant-numeric: tabular-nums; }
+  .strip-toggle { border: none; background: none; color: var(--accent-dark); font-size: 12px; font-weight: 600; text-decoration: underline; padding: 0; margin-left: auto; }
+  #assumptions { display: none; padding: 12px 18px 4px; }
+  #assumptions.show { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 700px) { #assumptions.show { grid-template-columns: 1fr; } }
+  .arow .lab { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; color: var(--soft); }
+  .arow .lab b { color: var(--accent-dark); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+
+  main { max-width: 1140px; margin: 0 auto; padding: 22px 24px 40px; }
+  .demo-grid { display: grid; grid-template-columns: 400px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .demo-grid { grid-template-columns: 1fr; } }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; }
+  .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .card .sub { color: var(--soft); font-size: 13px; }
+
+  .segment { display: flex; background: var(--ground); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; margin: 14px 0 4px; }
+  .segment button { flex: 1; border: none; background: none; padding: 8px 6px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--soft); }
+  .segment button.active { background: var(--card); color: var(--ink); box-shadow: 0 1px 4px rgba(20,22,40,0.10); }
+  .profile-line { font-size: 12.5px; color: var(--faint); margin-bottom: 12px; min-height: 18px; }
+
+  .order-row { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-top: 1px solid var(--line); }
+  .order-row .grow { flex: 1; min-width: 0; }
+  .order-row .name { font-weight: 600; font-size: 14px; }
+  .order-row .meta { font-size: 12px; color: var(--faint); }
+  .order-row .price { font-size: 13.5px; color: var(--soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .btn-oos { border: 1px solid var(--line); background: var(--card); color: var(--red); font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 8px; white-space: nowrap; }
+  .btn-oos:hover { background: var(--red-bg); border-color: var(--red); }
+  .btn-x { border: none; background: none; color: var(--faint); font-size: 15px; padding: 4px 6px; }
+  .btn-x:hover { color: var(--red); }
+  .add-row { display: flex; gap: 8px; margin-top: 14px; }
+  .add-row select { flex: 1; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 13px; color: var(--ink); background: var(--card); min-width: 0; }
+  .btn-ghost { border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent-dark); }
+
+  /* ---- response ---- */
+  .empty-state { text-align: center; padding: 80px 30px; color: var(--faint); }
+  .empty-state .hint { font-size: 13.5px; max-width: 42ch; margin: 10px auto 0; }
+  .loading { text-align: center; padding: 90px 30px; color: var(--soft); }
+  .spinner { width: 26px; height: 26px; border-radius: 50%; margin: 0 auto 14px; border: 3px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
+  .pipeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  @media (max-width: 700px) { .pipeline { grid-template-columns: repeat(2, 1fr); } }
+  .pipe-step { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; }
+  .pipe-step .k { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+  .pipe-step .v { font-size: 13.5px; font-weight: 700; margin-top: 3px; }
+  .pipe-step .d { font-size: 11.5px; color: var(--faint); margin-top: 1px; }
+
+  .offer-card { border-left: 3px solid var(--accent); }
+  .oos-line { font-size: 13px; color: var(--soft); margin-bottom: 10px; }
+  .oos-line b { color: var(--red); }
+  .best-name { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .chips { display: flex; gap: 6px; margin: 8px 0 10px; flex-wrap: wrap; }
+  .chip { font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+  .chip.safe { background: var(--green-bg); color: var(--green); }
+  .chip.neutral { background: var(--accent-bg); color: var(--accent-dark); }
+  .reason { color: var(--ink); margin-bottom: 16px; max-width: 64ch; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn-primary { border: none; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; padding: 10px 22px; border-radius: 9px; }
+  .btn-primary:hover { background: var(--accent-dark); }
+  .btn-secondary { border: 1px solid var(--line); background: var(--card); color: var(--soft); font-size: 14px; font-weight: 600; padding: 10px 18px; border-radius: 9px; }
+  .btn-secondary:hover { border-color: var(--soft); color: var(--ink); }
+
+  details { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+  details summary { cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--accent-dark); list-style: none; }
+  details summary::before { content: "+ "; }
+  details[open] summary::before { content: "- "; }
+  details .body { padding-top: 10px; font-size: 13.5px; color: var(--soft); }
+  .proof { font-family: var(--mono); font-size: 12px; background: var(--ground); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; overflow-x: auto; white-space: pre; line-height: 1.8; color: var(--ink); }
+  .blocked-item { padding: 6px 0; border-top: 1px dashed var(--line); font-size: 13px; }
+  .blocked-item b { color: var(--ink); }
+  .blocked-item span { color: var(--faint); font-size: 12.5px; }
+  .alt-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px dashed var(--line); }
+  .alt-row .grow { flex: 1; }
+  .alt-row .name { font-weight: 600; font-size: 13.5px; }
+  .alt-row .r { font-size: 12.5px; color: var(--soft); }
+
+  .callout { border-radius: 10px; padding: 14px 18px; margin-top: 14px; font-size: 13.5px; }
+  .callout.danger { background: var(--red-bg); color: #7C2D28; border: 1px solid #EBC7C4; }
+  .callout.info { background: var(--ground); color: var(--soft); border: 1px solid var(--line); }
+  .callout b { color: var(--red); }
+  .callout.info b { color: var(--ink); }
+
+  /* ---- footer ---- */
+  footer { border-top: 1px solid var(--line); margin-top: 30px; background: var(--card); }
+  .foot-inner { max-width: 1140px; margin: 0 auto; padding: 16px 24px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--faint); }
+  .foot-inner .links { margin-left: auto; display: flex; gap: 16px; }
+  .foot-link { border: none; background: none; color: var(--soft); font-size: 12.5px; font-weight: 600; text-decoration: underline; padding: 0; }
+  .foot-link:hover { color: var(--accent-dark); }
+
+  /* ---- modal ---- */
+  .modal-back { position: fixed; inset: 0; background: rgba(20,22,40,0.45); z-index: 90; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .modal-back.show { display: flex; }
+  .modal { background: var(--card); border-radius: 14px; max-width: 860px; width: 100%; max-height: 88vh; overflow-y: auto; padding: 24px 26px; }
+  .modal h3 { font-size: 17px; margin-bottom: 4px; }
+  .modal .sub { color: var(--soft); font-size: 13px; margin-bottom: 14px; }
+  .modal-close { float: right; border: none; background: var(--ground); border-radius: 8px; width: 30px; height: 30px; font-size: 15px; color: var(--soft); }
+  .code { font-family: var(--mono); font-size: 12px; line-height: 1.7; background: #23253A; color: #E8E9F2; border-radius: 10px; padding: 16px 18px; overflow-x: auto; white-space: pre; }
+  canvas { width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--soft); flex-wrap: wrap; margin: 10px 0; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--faint); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 10px 6px; border-bottom: 1px solid var(--line); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  .tag-yes { color: var(--green); font-weight: 600; }
+  .tag-no { color: var(--red); font-weight: 600; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+  .bullets { font-size: 13.5px; color: var(--soft); padding-left: 18px; }
+  .bullets li { margin: 6px 0; }
+
+  #toast { position: fixed; bottom: 24px; right: 24px; z-index: 100; background: var(--ink); color: #fff; font-size: 13.5px; padding: 12px 18px; border-radius: 10px; max-width: 380px; box-shadow: 0 8px 30px rgba(20,22,40,0.25); opacity: 0; transform: translateY(8px); transition: all 0.25s; pointer-events: none; }
+  #toast.show { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-inner">
+    <div class="wordmark">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <circle cx="5" cy="11" r="3.2" fill="#5A4FB5"/>
+        <circle cx="16.5" cy="4.5" r="2.6" fill="#5A4FB5" opacity="0.55"/>
+        <circle cx="16.5" cy="17.5" r="2.6" fill="#5A4FB5" opacity="0.55"/>
+        <path d="M7.5 9.5 L14.5 5.5 M7.5 12.5 L14.5 16.5" stroke="#5A4FB5" stroke-width="1.6"/>
+      </svg>
+      SwapIQ
+    </div>
+    <div class="tagline">When an ordered item goes out of stock, keep the sale: a substitute that is provably safe for this exact customer, explained in one line.</div>
+    <div class="session-stats">
+      <div class="sstat"><div class="v" id="stHandled">0</div><div class="k">Stockouts</div></div>
+      <div class="sstat"><div class="v" id="stAccept">-</div><div class="k">Accepted</div></div>
+      <div class="sstat"><div class="v" id="stSaved">Rs. 0</div><div class="k">Retained</div></div>
+      <div class="status-dot fallback" id="aiStatus"><i></i><span>connecting</span></div>
+    </div>
+  </div>
+</header>
+
+<div id="impactStrip">
+  <div class="strip-card" id="stripCard">
+    <span id="stripText"></span>
+    <button class="strip-toggle" id="stripToggle">adjust assumptions</button>
+  </div>
+  <div id="assumptions">
+    <div class="arow"><div class="lab"><span>Orders per day, per store</span><b id="av1">1,500</b></div><input type="range" id="as1" min="200" max="5000" step="100" value="1500"></div>
+    <div class="arow"><div class="lab"><span>Order lines hitting a stockout</span><b id="av2">8%</b></div><input type="range" id="as2" min="3" max="15" value="8"></div>
+    <div class="arow"><div class="lab"><span>Average affected item value</span><b id="av3">Rs. 150</b></div><input type="range" id="as3" min="50" max="500" step="10" value="150"></div>
+  </div>
+</div>
+
+<main>
+  <div class="demo-grid">
+    <div class="card">
+      <h2>The order</h2>
+      <p class="sub">7 to 10 percent of real order lines are out of stock by pick time. Choose who is shopping, then make it happen.</p>
+      <div class="segment" id="shopperSeg"></div>
+      <div class="profile-line" id="profileLine"></div>
+      <div id="orderList"></div>
+      <div class="add-row">
+        <select id="addSelect"></select>
+        <button class="btn-ghost" id="addBtn">Add</button>
+      </div>
+    </div>
+    <div id="responsePanel"></div>
+  </div>
+</main>
+
+<footer>
+  <div class="foot-inner">
+    <span>Deterministic graph safety first, Claude judgment second, learning from every tap. Similarity is not substitutability.</span>
+    <div class="links">
+      <button class="foot-link" id="linkGraph">Explore the graph</button>
+      <button class="foot-link" id="linkApi">View the API</button>
+      <button class="foot-link" id="linkLog">Session log</button>
+      <button class="foot-link" id="linkReset">Reset session</button>
+    </div>
+  </div>
+</footer>
+
+<!-- graph modal -->
+<div class="modal-back" id="graphModal">
+  <div class="modal">
+    <button class="modal-close" data-close="graphModal">&times;</button>
+    <h3>The knowledge graph, live</h3>
+    <p class="sub">Everything SwapIQ knows about a product and its safe neighbours. SWAP weights update as you accept or decline.</p>
+    <select id="graphSelect" style="padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:13px; max-width:100%"></select>
+    <div class="legend">
+      <span><i style="background:#5A4FB5"></i>product</span>
+      <span><i style="background:#B45309"></i>ingredient</span>
+      <span><i style="background:#B3403A"></i>allergen</span>
+      <span><i style="background:#177A42"></i>diet tag</span>
+      <span><i style="background:#5D6374"></i>category</span>
+    </div>
+    <canvas id="graphCanvas" height="440"></canvas>
+  </div>
+</div>
+
+<!-- api modal -->
+<div class="modal-back" id="apiModal">
+  <div class="modal">
+    <button class="modal-close" data-close="apiModal">&times;</button>
+    <h3>The product is one API call</h3>
+    <p class="sub">This page runs on the same endpoints a retailer would consume.</p>
+    <div class="two-col">
+      <div>
+        <div class="code">POST /api/swap-offer
+{ "product_id": "P001",
+  "shopper_id": "S1" }
+
+200 OK
+{
+  "best": {
+    "name": "FreshFarm Oat Milk Barista",
+    "reason": "Nut-free vegan plant milk,
+       priced within Rs. 2 of your usual.",
+    "paths": ["Shopper AVOIDS nuts:
+       no CONTAINS path reaches OatMilk"]
+  },
+  "safe_count": 18, "blocked_count": 5,
+  "graph_ms": 1.2, "rank_s": 0.9
+}</div>
+      </div>
+      <div>
+        <p style="font-weight:700; font-size:13.5px; margin-bottom:6px">What a retailer provides</p>
+        <ul class="bullets">
+          <li>Product catalog with ingredient data (FSSAI labels already carry it)</li>
+          <li>Shopper dietary profiles, one screen at signup</li>
+          <li>The stockout event from the picker app</li>
+          <li>The accept or decline response, one webhook</li>
+        </ul>
+        <p style="font-weight:700; font-size:13.5px; margin:14px 0 6px">Scaling path</p>
+        <ul class="bullets">
+          <li>This demo: in-memory graph, 200 SKUs, instant</li>
+          <li>Production: identical schema on Neo4j, millions of SKUs</li>
+          <li>One LLM call per stockout, about one second</li>
+          <li>Stateless service, horizontally scalable</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- log modal -->
+<div class="modal-back" id="logModal">
+  <div class="modal">
+    <button class="modal-close" data-close="logModal">&times;</button>
+    <h3>Session log</h3>
+    <p class="sub">Every offer, the outcome, and what the system learned. Stored in your browser only.</p>
+    <div style="overflow-x:auto"><table id="logTable"></table></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem("swapiq") || "{}"); } catch { return {}; } },
+  set(v) { localStorage.setItem("swapiq", JSON.stringify(v)); },
+};
+const state = { data: null, shopperId: "S1", cart: [], offer: null, busy: false,
+                learned: store.get().learned || {}, log: store.get().log || [] };
+
+function persist() { store.set({ learned: state.learned, log: state.log }); }
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 4500);
+}
+
+/* ---------- boot ---------- */
+async function boot() {
+  const res = await fetch("/api/bootstrap");
+  state.data = await res.json();
+  state.cart = [...(state.data.demo_carts[state.shopperId] || [])];
+  const chip = $("#aiStatus");
+  if (state.data.claude) { chip.classList.remove("fallback"); chip.querySelector("span").textContent = "Claude live"; }
+  else { chip.querySelector("span").textContent = "fallback ranking"; }
+  renderShoppers(); renderCart(); renderAddSelect(); renderResponseEmpty();
+  renderStats(); renderGraphSelect();
+}
+
+const product = id => state.data.products.find(p => p.id === id);
+const shopper = () => state.data.shoppers.find(s => s.id === state.shopperId);
+
+function profileText(s) {
+  const bits = [];
+  if (s.avoids.length) bits.push("Avoids " + s.avoids.join(", "));
+  if (s.diet.length) bits.push("Diet: " + s.diet.join(", "));
+  if (s.budget_sensitive) bits.push("Budget conscious");
+  return bits.join("  |  ") || "No dietary restrictions";
+}
+
+/* ---------- order panel ---------- */
+function renderShoppers() {
+  $("#shopperSeg").innerHTML = state.data.shoppers.map(s =>
+    `<button class="${s.id === state.shopperId ? "active" : ""}" data-id="${s.id}">${s.name.split(" (")[0]}</button>`).join("");
+  $("#profileLine").textContent = profileText(shopper());
+  document.querySelectorAll("#shopperSeg button").forEach(b => b.addEventListener("click", () => {
+    state.shopperId = b.dataset.id;
+    state.cart = [...(state.data.demo_carts[state.shopperId] || [])];
+    state.offer = null;
+    renderShoppers(); renderCart(); renderAddSelect(); renderResponseEmpty();
+  }));
+}
+
+function renderCart() {
+  $("#orderList").innerHTML = state.cart.map(id => {
+    const p = product(id);
+    const meta = p.category + (p.allergens.length ? " · contains " + p.allergens.join(", ") : " · no major allergens");
+    return `<div class="order-row">
+      <div class="grow"><div class="name">${p.name}</div><div class="meta">${meta}</div></div>
+      <div class="price">Rs. ${p.price}</div>
+      <button class="btn-oos" data-id="${p.id}">Out of stock</button>
+      <button class="btn-x" data-rm="${p.id}" title="Remove">&times;</button>
+    </div>`;
+  }).join("") || `<p class="sub" style="padding:14px 2px">The order is empty. Add a product below.</p>`;
+  document.querySelectorAll(".btn-oos").forEach(b => b.addEventListener("click", () => stockout(b.dataset.id)));
+  document.querySelectorAll(".btn-x").forEach(b => b.addEventListener("click", () => {
+    state.cart = state.cart.filter(x => x !== b.dataset.rm);
+    renderCart(); renderAddSelect();
+  }));
+}
+
+function renderAddSelect() {
+  const opts = state.data.products.filter(p => !state.cart.includes(p.id))
+    .map(p => `<option value="${p.id}">${p.name} (Rs. ${p.price})</option>`).join("");
+  $("#addSelect").innerHTML = `<option value="">Add a product to the order</option>` + opts;
+}
+$("#addBtn").addEventListener("click", () => {
+  const v = $("#addSelect").value;
+  if (v) { state.cart.push(v); renderCart(); renderAddSelect(); }
+});
+
+function renderResponseEmpty() {
+  $("#responsePanel").innerHTML = `<div class="card empty-state">
+    <b>Waiting for a stockout</b>
+    <p class="hint">Best first run: keep the nut-allergy shopper selected and mark the almond milk out of stock. Watch what SwapIQ refuses to suggest.</p>
+  </div>`;
+}
+
+/* ---------- swap flow ---------- */
+async function stockout(productId) {
+  if (state.busy) return;
+  state.busy = true;
+  const p = product(productId);
+  $("#responsePanel").innerHTML = `<div class="card loading">
+    <div class="spinner"></div>
+    <div id="loadMsg"><b>${p.name}</b> is out of stock.<br>Traversing the knowledge graph...</div>
+  </div>`;
+  const h = setTimeout(() => {
+    const m = $("#loadMsg");
+    if (m) m.innerHTML = `<b>${p.name}</b> is out of stock.<br>Safety confirmed. ${state.data.claude ? "Claude is writing the offer..." : "Ranking the safe options..."}`;
+  }, 900);
+  try {
+    const res = await fetch("/api/swap-offer", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product_id: productId, shopper_id: state.shopperId, learned: state.learned }),
+    });
+    state.offer = await res.json();
+    renderOffer();
+  } catch (e) {
+    $("#responsePanel").innerHTML = `<div class="card"><b>Something went wrong.</b><p class="sub">${e}</p></div>`;
+  } finally { clearTimeout(h); state.busy = false; }
+}
+
+function renderOffer() {
+  const o = state.offer;
+  const src = o.source === "claude" ? "Claude" : "fallback ranker";
+
+  const pipeline = `<div class="pipeline">
+    <div class="pipe-step"><div class="k">Stockout</div><div class="v">Rs. ${o.oos.price} at risk</div><div class="d">${o.oos.name}</div></div>
+    <div class="pipe-step"><div class="k">Graph safety filter</div><div class="v">${o.safe_count} safe · ${o.blocked_count} removed</div><div class="d">${o.checked_count} checked in ${o.graph_ms} ms</div></div>
+    <div class="pipe-step"><div class="k">AI ranking</div><div class="v">${o.best ? "Top pick + " + o.alternatives.length + " options" : "Skipped"}</div><div class="d">${o.best ? src + ", " + o.rank_s + " s" : "nothing safe to rank"}</div></div>
+    <div class="pipe-step"><div class="k">Customer</div><div class="v">One tap</div><div class="d">every decision teaches the graph</div></div>
+  </div>`;
+
+  let body;
+  if (!o.best) {
+    body = `<div class="card offer-card">
+      <div class="oos-line"><b>${o.oos.name}</b> is out of stock.</div>
+      <p><b>No substitute passes the safety check for this shopper.</b></p>
+      <p class="sub" style="margin-top:6px">SwapIQ issues an immediate refund with an honest explanation. It never guesses when safety cannot be proven.</p>
+      ${o.blocked.length ? `<details><summary>Removed by the graph (${o.blocked.length})</summary><div class="body">${o.blocked.map(x => `<div class="blocked-item"><b>${x.name}</b><br><span>${x.reason}</span></div>`).join("")}</div></details>` : ""}
+    </div>`;
+  } else {
+    const b = o.best;
+    const diff = b.price - o.oos.price;
+    const delta = diff < 0 ? `Rs. ${-diff} cheaper` : diff > 0 ? `Rs. ${diff} more` : "same price";
+    body = `<div class="card offer-card">
+      <div class="oos-line"><b>${o.oos.name}</b> is out of stock. Recommended substitute:</div>
+      <div class="best-name">${b.name}</div>
+      <div class="chips">
+        <span class="chip safe">Verified safe for this shopper</span>
+        <span class="chip neutral">Rs. ${b.price} · ${delta}</span>
+      </div>
+      <div class="reason">${b.reason}</div>
+      <div class="actions">
+        <button class="btn-primary" id="acceptBtn">Accept substitute</button>
+        <button class="btn-secondary" id="declineBtn">Decline, refund instead</button>
+      </div>
+      ${o.alternatives.length ? `<details><summary>Other safe options (${o.alternatives.length})</summary><div class="body">
+        ${o.alternatives.map(a => `<div class="alt-row">
+          <div class="grow"><div class="name">${a.name} · Rs. ${a.price}</div><div class="r">${a.reason}</div></div>
+          <button class="btn-ghost" data-alt="${a.id}">Accept</button>
+        </div>`).join("")}</div></details>` : ""}
+      <details><summary>How SwapIQ decided</summary><div class="body">
+        <p>1. <b>Safety filter:</b> ${o.checked_count} same-category candidates checked against this shopper's constraints. ${o.safe_count} passed, ${o.blocked_count} removed. Deterministic, ${o.graph_ms} ms.</p>
+        <p>2. <b>Ranking (${src}):</b> saw only the ${o.safe_count} safe candidates. ${o.rank_s} s.</p>
+        <p>3. <b>Learning:</b> your decision updates the swap confidence between these products.</p>
+        <p style="margin-top:8px"><b>Safety proof</b></p>
+        <div class="proof">${b.paths.join("\n")}</div>
+        ${o.blocked.length ? `<p style="margin-top:8px"><b>Removed by the graph</b></p>` + o.blocked.map(x => `<div class="blocked-item"><b>${x.name}</b><br><span>${x.reason}</span></div>`).join("") : ""}
+        <p style="margin-top:10px"><button class="btn-ghost" id="seeGraphBtn">See this in the graph</button></p>
+      </div></details>
+    </div>`;
+  }
+
+  let compare = "";
+  if (o.naive) {
+    compare = o.naive.unsafe
+      ? `<div class="callout danger">A similarity-based engine would have suggested <b>${o.naive.name}</b>, which is unsafe for this shopper (contains ${o.naive.allergens.join(", ")}). SwapIQ's graph removed it before the AI ever saw it.</div>`
+      : `<div class="callout info">A similarity-based engine would have suggested <b>${o.naive.name}</b>. Safe here, but nothing guaranteed it. Try the nut-allergy shopper with the almond milk to see the failure case.</div>`;
+  }
+
+  $("#responsePanel").innerHTML = pipeline + body + compare;
+
+  if (o.best) {
+    $("#acceptBtn").addEventListener("click", () => decide(o.best, true));
+    $("#declineBtn").addEventListener("click", () => decide(o.best, false));
+    document.querySelectorAll("[data-alt]").forEach(btn => {
+      const alt = o.alternatives.find(a => a.id === btn.dataset.alt);
+      btn.addEventListener("click", () => decide(alt, true));
+    });
+    const sg = $("#seeGraphBtn");
+    if (sg) sg.addEventListener("click", () => { openModal("graphModal"); $("#graphSelect").value = o.oos.id; drawGraph(); });
+  }
+}
+
+async function decide(chosen, accepted) {
+  const o = state.offer;
+  const res = await fetch("/api/decide", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ oos_id: o.oos.id, chosen_id: chosen.id, accepted, learned: state.learned }),
+  });
+  const j = await res.json();
+  state.learned[j.edge] = { weight: j.weight_after, decisions: (state.learned[j.edge]?.decisions || 0) + 1 };
+  state.log.push({
+    time: new Date().toISOString().slice(0, 19).replace("T", " "),
+    shopper: shopper().name.split(" (")[0],
+    oos: o.oos.name, offered: chosen.name, accepted,
+    saved: accepted ? chosen.price : 0, lost: accepted ? 0 : o.oos.price,
+    w0: j.weight_before, w1: j.weight_after,
+  });
+  persist();
+  state.offer = null;
+  renderResponseEmpty(); renderStats();
+  toast(accepted
+    ? `Substitution accepted. Rs. ${chosen.price} retained. Swap confidence learned: ${j.weight_before.toFixed(2)} to ${j.weight_after.toFixed(2)}.`
+    : `Declined. Swap confidence lowered: ${j.weight_before.toFixed(2)} to ${j.weight_after.toFixed(2)}. Future offers improve from this.`);
+}
+
+/* ---------- ambient impact ---------- */
+function renderStats() {
+  const n = state.log.length;
+  const acc = state.log.filter(d => d.accepted).length;
+  const saved = state.log.reduce((s, d) => s + d.saved, 0);
+  $("#stHandled").textContent = n;
+  $("#stAccept").textContent = n ? Math.round(acc / n * 100) + "%" : "-";
+  $("#stSaved").textContent = "Rs. " + saved.toLocaleString("en-IN");
+  renderImpactStrip();
+  renderLogTable();
+}
+
+function renderImpactStrip() {
+  const n = state.log.length;
+  if (!n) { $("#impactStrip").classList.remove("show"); return; }
+  $("#impactStrip").classList.add("show");
+  const acc = state.log.filter(d => d.accepted).length / n;
+  const orders = +$("#as1").value, rate = +$("#as2").value, val = +$("#as3").value;
+  $("#av1").textContent = orders.toLocaleString("en-IN");
+  $("#av2").textContent = rate + "%";
+  $("#av3").textContent = "Rs. " + val;
+  const daily = orders * rate / 100 * acc * val;
+  const yearLakh = (daily * 365 / 1e5).toFixed(1);
+  const chainCrore = Math.round(daily * 365 * 2000 / 1e7).toLocaleString("en-IN");
+  $("#stripText").innerHTML =
+    `At this session's <b>${Math.round(acc * 100)}%</b> acceptance: one store recovers about ` +
+    `<b>Rs. ${Math.round(daily).toLocaleString("en-IN")}</b> per day, <b>Rs. ${yearLakh} lakh</b> per year. ` +
+    `Across 2,000 stores: <b>Rs. ${chainCrore} crore</b> per year. Silent refunds recover zero.`;
+}
+["as1", "as2", "as3"].forEach(id => $("#" + id).addEventListener("input", renderImpactStrip));
+$("#stripToggle").addEventListener("click", () => $("#assumptions").classList.toggle("show"));
+
+function renderLogTable() {
+  const rows = [...state.log].reverse().map(d => `<tr>
+    <td>${d.time}</td><td>${d.shopper}</td><td>${d.oos}</td><td>${d.offered}</td>
+    <td class="${d.accepted ? "tag-yes" : "tag-no"}">${d.accepted ? "Accepted" : "Declined"}</td>
+    <td>${d.w0.toFixed(2)} to ${d.w1.toFixed(2)}</td></tr>`).join("");
+  $("#logTable").innerHTML = rows
+    ? `<tr><th>Time</th><th>Shopper</th><th>Out of stock</th><th>Offered</th><th>Outcome</th><th>Confidence</th></tr>` + rows
+    : `<tr><td style="padding:14px 10px; color:var(--faint)">No decisions yet. Run a stockout first.</td></tr>`;
+}
+
+/* ---------- modals ---------- */
+function openModal(id) { $("#" + id).classList.add("show"); }
+document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => $("#" + b.dataset.close).classList.remove("show")));
+document.querySelectorAll(".modal-back").forEach(m => m.addEventListener("click", e => { if (e.target === m) m.classList.remove("show"); }));
+$("#linkApi").addEventListener("click", () => openModal("apiModal"));
+$("#linkLog").addEventListener("click", () => { renderLogTable(); openModal("logModal"); });
+$("#linkGraph").addEventListener("click", () => { openModal("graphModal"); drawGraph(); });
+$("#linkReset").addEventListener("click", () => {
+  state.learned = {}; state.log = []; persist();
+  state.cart = [...(state.data.demo_carts[state.shopperId] || [])];
+  state.offer = null;
+  renderCart(); renderAddSelect(); renderResponseEmpty(); renderStats();
+  toast("Session cleared. Learned confidence and log reset.");
+});
+
+/* ---------- graph canvas ---------- */
+function renderGraphSelect() {
+  const sel = $("#graphSelect");
+  sel.innerHTML = state.data.products.map(p =>
+    `<option value="${p.id}" ${p.id === "P001" ? "selected" : ""}>${p.name}</option>`).join("");
+  sel.addEventListener("change", drawGraph);
+}
+
+const NODE_COLORS = { product: "#5A4FB5", ingredient: "#B45309", allergen: "#B3403A", diet_tag: "#177A42", category: "#5D6374" };
+
+async function drawGraph() {
+  const focus = $("#graphSelect").value || "P001";
+  const res = await fetch("/api/graph", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ focus, learned: state.learned }),
+  });
+  const g = await res.json();
+  const canvas = $("#graphCanvas");
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth || 780, H = 440;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const cx = W / 2, cy = H / 2;
+  const pos = { [g.focus]: [cx, cy] };
+  const ring1 = g.nodes.filter(n => n.id !== g.focus && n.type !== "allergen" && n.type !== "product");
+  const swaps = g.nodes.filter(n => n.id !== g.focus && n.type === "product");
+  const allergens = g.nodes.filter(n => n.type === "allergen");
+
+  ring1.forEach((n, i) => {
+    const a = -Math.PI / 2 + (i / Math.max(ring1.length, 1)) * 2 * Math.PI;
+    pos[n.id] = [cx + Math.cos(a) * 145, cy + Math.sin(a) * 105];
+  });
+  swaps.forEach((n, i) => {
+    const a = -0.5 + i * 0.55;
+    pos[n.id] = [cx + Math.cos(a) * 310, cy + Math.sin(a) * 140];
+  });
+  allergens.forEach((n) => {
+    const parent = g.edges.find(e => e.to === n.id);
+    const [px, py] = pos[parent ? parent.from : g.focus] || [cx, cy];
+    const dx = px - cx, dy = py - cy, len = Math.hypot(dx, dy) || 1;
+    pos[n.id] = [px + dx / len * 88, py + dy / len * 66];
+  });
+
+  ctx.font = "10.5px Consolas, monospace";
+  g.edges.forEach(e => {
+    const [x1, y1] = pos[e.from] || [cx, cy];
+    const [x2, y2] = pos[e.to] || [cx, cy];
+    ctx.strokeStyle = e.label.startsWith("SWAP") ? "#B9B3E4" : "#DADCE8";
+    ctx.lineWidth = e.label.startsWith("SWAP") ? 1.6 : 1.1;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = "#9CA0B4";
+    ctx.fillText(e.label, (x1 + x2) / 2 + 4, (y1 + y2) / 2 - 4);
+  });
+
+  ctx.font = "600 11.5px 'Segoe UI', sans-serif";
+  ctx.textAlign = "center";
+  g.nodes.forEach(n => {
+    const [x, y] = pos[n.id];
+    const r = n.id === g.focus ? 13 : 8;
+    ctx.fillStyle = NODE_COLORS[n.type] || "#999";
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = "#1B1F2E";
+    const label = n.label.length > 26 ? n.label.slice(0, 25) + "..." : n.label;
+    ctx.fillText(label, x, y + r + 13);
+  });
+  ctx.textAlign = "left";
+}
+
+boot();
+</script>
+</body>
+</html>
