@@ -48,7 +48,15 @@ Open http://localhost:8000. Set `ANTHROPIC_API_KEY` to enable Claude ranking; wi
 
 Deployed on Vercel. `vercel.json` routes `/api/*` to the FastAPI serverless function; `public/` is served statically. Add `ANTHROPIC_API_KEY` as a Vercel environment variable to enable Claude.
 
+## Neo4j (production graph)
+
+The demo runs on an in-memory NetworkX graph. The same schema loads unchanged
+into Neo4j, the production graph database: see [NEO4J_SETUP.md](NEO4J_SETUP.md)
+and `neo4j_loader.py`, which loads the catalog and runs the safety traversal as
+Cypher.
+
 ## Documentation
 
 - [Product Requirements (PRD)](docs/PRD.md)
 - [Low-Level Design (LLD)](docs/LLD.md)
+- [Neo4j setup](NEO4J_SETUP.md)
