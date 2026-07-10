@@ -32,8 +32,31 @@ RANKING_SCHEMA = {
 }
 
 
+def get_api_key():
+    """Env var first (Vercel), then a local secrets file for laptop demos."""
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if key:
+        return key
+    try:
+        import tomllib
+        candidates = [
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                         ".streamlit", "secrets.toml"),
+        ]
+        for path in candidates:
+            if os.path.exists(path):
+                with open(path, "rb") as f:
+                    k = tomllib.load(f).get("ANTHROPIC_API_KEY")
+                    if k:
+                        os.environ["ANTHROPIC_API_KEY"] = k
+                        return k
+    except Exception:
+        pass
+    return None
+
+
 def claude_available():
-    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+    return bool(get_api_key())
 
 
 def rank_and_explain(oos_product, candidates, shopper, top_n=3):
@@ -48,11 +71,12 @@ def rank_and_explain(oos_product, candidates, shopper, top_n=3):
 
 
 def _rank_with_claude(oos_product, candidates, shopper, top_n):
-    if not claude_available():
+    key = get_api_key()
+    if not key:
         return None
     try:
         import anthropic
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(api_key=key)
     except Exception:
         return None
 
