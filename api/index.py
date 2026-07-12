@@ -32,6 +32,7 @@ DEMO_CARTS = {
     "S1": ["Almond Milk Unsweetened", "Whole Wheat Bread", "Salted Potato Chips"],
     "S2": ["Gluten Free Bread", "Basmati Rice 1kg", "Greek Yogurt Plain"],
     "S3": ["Toned Milk", "Marie Light Biscuits", "Cola 750ml"],
+    "S4": ["Sesame Tahini", "Whole Wheat Bread", "Toned Milk"],
 }
 
 

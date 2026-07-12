@@ -251,7 +251,7 @@ POST /api/swap-offer
     "reason": "Nut-free vegan plant milk,
        within Rs.2 of your usual.",
     "safety": "proven by graph traversal" },
-  "safe_count": 18, "blocked_count": 5 }</div><div><p style="font-weight:700;font-size:13px;margin-bottom:6px">What the retailer provides</p><ul class="bullets"><li>Product catalog with ingredient data (FSSAI labels already carry it)</li><li>Shopper dietary profiles, one signup screen</li><li>The stockout event from the picker app</li><li>The accept or refund tap, one webhook</li></ul><p style="font-weight:700;font-size:13px;margin:12px 0 6px">Scaling path</p><ul class="bullets"><li>This demo: in-memory graph, 195 SKUs</li><li>Production: same schema on Neo4j, millions of SKUs</li><li>One LLM call per stockout, about one second</li><li>Stateless, horizontally scalable</li></ul></div></div></div></div>
+  "safe_count": 18, "blocked_count": 5 }</div><div><p style="font-weight:700;font-size:13px;margin-bottom:6px">What the retailer provides</p><ul class="bullets"><li>Product catalog with ingredient data (FSSAI labels already carry it)</li><li>Shopper dietary profiles, one signup screen</li><li>The stockout event from the picker app</li><li>The accept or refund tap, one webhook</li></ul><p style="font-weight:700;font-size:13px;margin:12px 0 6px">Scaling path</p><ul class="bullets"><li>This demo: in-memory graph, 500+ SKUs, 24 categories</li><li>Production: same schema on Neo4j, millions of SKUs</li><li>One LLM call per stockout, about one second</li><li>Stateless, horizontally scalable</li></ul></div></div></div></div>
 
 <div id="toast"></div>
 
