@@ -101,6 +101,26 @@ def bootstrap():
     }
 
 
+@app.post("/api/safety-check")
+def safety_check(req: OfferRequest):
+    """The deterministic half: graph safety traversal only, no LLM. Returns
+    instantly so the UI can show what the graph removed before Claude ranks."""
+    oos = products_by_id[req.product_id]
+    shopper = _shopper(req.shopper_id)
+    t0 = time.perf_counter()
+    safe, blocked = safe_candidates(G, oos["id"], shopper, req.learned)
+    graph_ms = round((time.perf_counter() - t0) * 1000, 1)
+    naive = _naive_pick(oos)
+    naive_out = {**_slim(naive), "unsafe": _is_unsafe(naive, shopper)} if naive else None
+    return {
+        "oos": _slim(oos),
+        "safe_count": len(safe), "blocked_count": len(blocked),
+        "checked_count": len(safe) + len(blocked), "graph_ms": graph_ms,
+        "blocked": [{"name": b["name"], "reason": b["blocked_reason"]} for b in blocked[:10]],
+        "naive": naive_out,
+    }
+
+
 @app.post("/api/swap-offer")
 def swap_offer(req: OfferRequest):
     oos = products_by_id[req.product_id]
