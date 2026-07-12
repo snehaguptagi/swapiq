@@ -32,6 +32,15 @@
   .acct .av{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px}
   .acct .who{font-size:12.5px;line-height:1.25}.acct .who b{display:block;font-size:13px}
   .acct .who span{color:var(--amber);font-weight:600;font-size:11px}
+  .swiq{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 12px}
+  .swiq:hover{border-color:var(--accent)}
+  .swiq-lab{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+  .swiq-track{width:38px;height:21px;border-radius:999px;background:#CFD2DE;position:relative;transition:background .2s}
+  .swiq-knob{position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s}
+  .swiq.on .swiq-track{background:var(--accent)}
+  .swiq.on .swiq-knob{left:19px}
+  .swiq-state{font-size:12px;font-weight:800;min-width:46px;text-align:left;color:var(--soft)}
+  .swiq.on .swiq-state{color:var(--accent-dark)}
   .cart-btn{position:relative;background:var(--qc);color:#fff;border:none;border-radius:10px;padding:9px 15px;font-weight:700;font-size:13.5px;display:flex;gap:8px;align-items:center}
   .cart-btn:hover{background:var(--qc-dark)}
   .cart-btn .count{background:#fff;color:var(--qc);border-radius:999px;min-width:20px;height:20px;padding:0 6px;display:inline-grid;place-items:center;font-size:12px;font-weight:800}
@@ -128,6 +137,13 @@
   .altline button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 11px;font-size:11.5px;font-weight:700;color:var(--qc-dark)}
   .whyx{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
   .proof{font-family:var(--mono);font-size:11px;background:var(--ground);border:1px solid var(--line);border-radius:8px;padding:9px;margin-top:7px;white-space:pre;overflow-x:auto;line-height:1.65}
+  .offer.rag{border-color:var(--amber)}
+  .offer.rag .powered{color:var(--amber);background:var(--amber-bg)}
+  .risk{background:var(--red-bg);border:1px solid #EBC7C4;border-radius:10px;padding:10px 12px;margin-bottom:11px;font-size:12px;color:#7C2D28}
+  .risk b{color:var(--red)}
+  .simchip{display:inline-block;font-size:10.5px;font-weight:700;color:var(--accent-dark);background:var(--accent-bg);padding:2px 8px;border-radius:6px;margin-top:6px}
+  .fixbtn{width:100%;border:none;border-radius:10px;padding:12px;font-size:13.5px;font-weight:700;background:var(--accent);color:#fff}
+  .fixbtn:hover{background:var(--accent-dark)}
   .thinking{display:flex;gap:10px;align-items:center;padding:14px;background:var(--ground);border-radius:11px;font-size:12.5px;color:var(--soft)}
   .confirm{text-align:center;padding:22px 14px}.confirm .big{font-size:38px;color:var(--qc)}
   .confirm h3{font-size:16px;margin:6px 0 3px}.confirm p{color:var(--soft);font-size:13px}
@@ -183,6 +199,11 @@
   <div class="brand"><span class="logo">Q</span><div>QuickCart<small>groceries in minutes</small></div></div>
   <div class="loc">Delivering to <b>HSR Layout</b> &middot; 8 min</div>
   <div class="nav-right">
+    <button class="swiq" id="swiqToggle" title="Switch the substitution engine">
+      <span class="swiq-lab">Engine</span>
+      <span class="swiq-track"><span class="swiq-knob"></span></span>
+      <span class="swiq-state" id="swiqState">RAG</span>
+    </button>
     <div class="acct" id="acctBtn"><span class="av" id="acctAv">S</span><div class="who"><b id="acctName">Sneha</b><span id="acctPf">avoids nuts, vegan</span></div></div>
     <button class="cart-btn" id="cartBtn">Cart <span class="count" id="cartCount">0</span></button>
   </div>
@@ -298,7 +319,7 @@ POST /api/swap-offer
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const store={get(){try{return JSON.parse(localStorage.getItem("swapiq")||"{}")}catch{return{}}},set(v){localStorage.setItem("swapiq",JSON.stringify(v))}};
-const state={data:null,shopperId:"S1",cart:{},order:null,oosId:null,offer:null,busy:false,learned:store.get().learned||{},log:store.get().log||[]};
+const state={data:null,shopperId:"S1",mode:"rag",cart:{},order:null,oosId:null,offer:null,busy:false,learned:store.get().learned||{},log:store.get().log||[]};
 const CAT_LABELS={plant_milk:"Plant Milk",dairy_milk:"Milk",yogurt:"Yogurt",dairy_alternatives:"Paneer & Tofu",bread:"Bread",pasta:"Pasta & Noodles",spreads:"Spreads",snacks:"Snacks",biscuits:"Biscuits",chocolate:"Chocolate",staples:"Staples",beverages:"Beverages"};
 const CAT_COLORS={plant_milk:"#5A9E6F",dairy_milk:"#4A80C4",yogurt:"#C48ABF",dairy_alternatives:"#C99A5B",bread:"#C08A4A",pasta:"#C4924A",spreads:"#B5794A",snacks:"#C46B5B",biscuits:"#B08A5A",chocolate:"#7A5240",staples:"#8A9A5B",beverages:"#5B9EC4"};
 function persist(){store.set({learned:state.learned,log:state.log})}
@@ -315,7 +336,7 @@ function cartTotal(){return Object.entries(state.cart).reduce((a,[id,q])=>a+prod
 
 async function boot(){
   state.data=await(await fetch("/api/bootstrap")).json();
-  seedCart();renderAcct();renderCart();renderPop();renderCartCount();renderGraphSelect();
+  seedCart();renderAcct();renderToggle();renderCart();renderPop();renderCartCount();renderGraphSelect();
 }
 function seedCart(){state.cart={};(state.data.demo_carts[state.shopperId]||[]).forEach(id=>state.cart[id]=1)}
 
@@ -347,6 +368,18 @@ function renderPop(){
 }
 function renderCartCount(){$("#cartCount").textContent=cartCount()}
 $("#cartBtn").onclick=()=>{document.querySelector("#view-setup").scrollIntoView({behavior:"smooth"})};
+
+/* ---- engine toggle: RAG vs SwapIQ ---- */
+function renderToggle(){
+  const on=state.mode==="swapiq";
+  $("#swiqToggle").classList.toggle("on",on);
+  $("#swiqState").textContent=on?"SwapIQ":"RAG";
+}
+$("#swiqToggle").onclick=()=>{
+  state.mode=state.mode==="swapiq"?"rag":"swapiq";renderToggle();
+  // if a stockout is on screen, re-resolve it live with the newly selected engine
+  if(state.oosId&&!$("#view-moment").classList.contains("hidden")&&!state.busy)runMoment(state.oosId);
+};
 
 /* ---- view switch ---- */
 function setView(v){$("#view-setup").classList.toggle("hidden",v!=="setup");$("#view-moment").classList.toggle("hidden",v!=="moment")}
@@ -380,7 +413,21 @@ function renderPhone(stage){
   </div><hr class="divide">${items}${extra}`;
   bindOffer();
 }
-function offerHTML(){
+function offerHTML(){return state.offer.mode==="rag"?offerHTMLrag():offerHTMLswapiq();}
+function offerHTMLrag(){
+  const o=state.offer,b=o.best;
+  if(!b)return `<div class="offer rag"><div class="top"><b>No match found</b><span class="powered">QuickCart standard (RAG)</span></div><p class="lead">${o.oos.name} is out of stock and similarity search found nothing close.</p><button class="fixbtn" id="fixBtn">Turn on SwapIQ &rarr;</button></div>`;
+  const risk=b.unsafe
+    ?`<div class="risk"><b>Allergen risk.</b> This contains ${b.allergens.join(", ")}. QuickCart's similarity search has no model of this shopper's allergies, so it recommends it anyway.</div>`
+    :`<div class="risk" style="background:var(--ground);border-color:var(--line);color:var(--soft)">Safe this time, but nothing was checked. Similarity is not safety.</div>`;
+  return `<div class="offer rag"><div class="top"><b>Recommended replacement</b><span class="powered">QuickCart standard (RAG)</span></div>
+    <p class="lead">${o.oos.name} is out of stock. Closest match by similarity:</p>
+    <div class="pick"><div class="th" style="background:${catColor(b.category)}">${initials(b.name)}</div>
+      <div class="grow"><div class="nm">${b.name}</div><div class="why">${b.reason}</div><span class="simchip">${b.similarity} cosine similarity</span></div></div>
+    ${risk}
+    <button class="fixbtn" id="fixBtn">Turn on SwapIQ to fix this &rarr;</button></div>`;
+}
+function offerHTMLswapiq(){
   const o=state.offer;
   if(!o.best)return `<div class="offer"><div class="top"><b>1 item is out of stock</b><span class="powered">SwapIQ</span></div>
     <p class="lead">${o.oos.name} is unavailable and no substitute is safe for your profile. We've refunded it.</p>
@@ -403,6 +450,7 @@ function bindOffer(){
   if(acc)acc.onclick=()=>decide(state.offer.best,true);
   if(ref)ref.onclick=()=>decide(state.offer.best,false);
   if(ok)ok.onclick=()=>{state.lastKind="refund";state.lastAmt=state.offer.oos.price;renderPhone("done")};
+  const fix=$("#fixBtn");if(fix)fix.onclick=()=>{state.mode="swapiq";renderToggle();runMoment(state.oosId)};
   $$("#phoneBody [data-alt]").forEach(bt=>{const a=state.offer.alternatives.find(x=>x.id===bt.dataset.alt);bt.onclick=()=>decide(a,true)});
 }
 
@@ -410,19 +458,52 @@ function bindOffer(){
 function resetEngine(){$$(".estep").forEach(e=>{e.classList.remove("on","done");e.querySelector(".ic").innerHTML=+e.dataset.step+1;const m=e.querySelector(".metric");if(m)m.remove()});$("#engExtra").innerHTML="";$("#impact").classList.add("hidden")}
 function setStep(i,st,detail,metric){const el=document.querySelector(`.estep[data-step="${i}"]`);if(!el)return;el.classList.remove("on","done");el.classList.add(st);const ic=el.querySelector(".ic");ic.innerHTML=st==="on"?`<div class="spin"></div>`:st==="done"?"&#10003;":+i+1;if(detail)el.querySelector(".d").textContent=detail;if(metric){let m=el.querySelector(".metric");if(!m){m=document.createElement("div");m.className="metric";el.querySelector(".grow").appendChild(m)}m.textContent=metric}}
 
+function renderEngineSkeleton(mode){
+  const steps=mode==="rag"?[
+    ["Embed the out-of-stock item","turn the product into a vector"],
+    ["Similarity search over the catalog","nearest neighbours by cosine"],
+    ["Return the closest product","no safety or profile check"]
+  ]:[
+    ["Stockout reported by the picker","the store shelf is empty"],
+    ["Knowledge graph safety filter","removes anything unsafe for this customer"],
+    ["AI ranks and explains","sees only the safe candidates"],
+    ["Customer decides","accept or refund, one tap"]
+  ];
+  $("#engFlow").innerHTML=steps.map((s,i)=>`<div class="estep" data-step="${i}"><div class="ic">${i+1}</div><div class="grow"><div class="t">${s[0]}</div><div class="d">${s[1]}</div></div></div>`).join("");
+  $("#engExtra").innerHTML="";$("#impact").classList.add("hidden");
+}
+
 async function runMoment(pid){
   if(state.busy)return;state.busy=true;
   state.oosId=pid;state.offer=null;
-  resetEngine();renderPhone("packing");
+  renderEngineSkeleton(state.mode);renderPhone("packing");
+  if(state.mode==="rag")await runRAG(pid);else await runSwapIQ(pid);
+  state.busy=false;
+}
+
+async function runRAG(pid){
+  setStep(0,"on");await sleep(500);setStep(0,"done","product embedded");
+  renderPhone("packing");
+  setStep(1,"on");
+  const o=await(await fetch("/api/rag-offer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({product_id:pid,shopper_id:state.shopperId,learned:state.learned})})).json();
+  state.offer=o;
+  setStep(1,"done",`${o.checked_count} neighbours scored`,"cosine similarity");
+  await sleep(450);
+  const b=o.best;
+  setStep(2,"done",b?`closest match: ${b.name}`:"no match","no safety check ran");
+  if(b&&b.unsafe)$("#engExtra").innerHTML=`<div class="blocked-box"><div class="bt">No safety step exists in this pipeline</div><div class="bi"><b>${b.name}</b> contains ${b.allergens.join(", ")}. Similarity ranked it top because it is made of similar things; it has no way to know that matters to this customer.</div></div>`;
+  renderPhone("offer");
+}
+
+async function runSwapIQ(pid){
   setStep(0,"on");await sleep(600);setStep(0,"done");
-  renderPhone("packing"); // item now flips to OUT
+  renderPhone("packing");
   setStep(1,"on");
   const sc=await(await fetch("/api/safety-check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({product_id:pid,shopper_id:state.shopperId,learned:state.learned})})).json();
   setStep(1,"done",`${sc.checked_count} candidates checked, ${sc.blocked_count} unsafe removed`,`deterministic - ${sc.graph_ms} ms`);
-  // reveal what the graph blocked + the similarity-engine trap, during the wait
   let ex="";
   if(sc.blocked.length)ex+=`<div class="blocked-box"><div class="bt">Removed before the AI saw them</div>${sc.blocked.slice(0,4).map(b=>`<div class="bi"><b>${b.name}</b> - ${b.reason}</div>`).join("")}</div>`;
-  if(sc.naive&&sc.naive.unsafe)ex+=`<div class="blocked-box"><div class="bt">A similarity-only engine would have picked</div><div class="bi"><b>${sc.naive.name}</b> - contains ${sc.naive.allergens.join(", ")}, unsafe for this customer</div></div>`;
+  if(sc.naive&&sc.naive.unsafe)ex+=`<div class="blocked-box"><div class="bt">RAG would have picked this (now blocked)</div><div class="bi"><b>${sc.naive.name}</b> - contains ${sc.naive.allergens.join(", ")}, unsafe for this customer</div></div>`;
   $("#engExtra").innerHTML=ex;
   await sleep(500);
   setStep(2,"on","Claude is writing the recommendation...");
@@ -433,7 +514,6 @@ async function runMoment(pid){
   else setStep(2,"done","no safe candidate - refund issued","safety first");
   setStep(3,"on","waiting for the customer's tap");
   renderPhone("offer");
-  state.busy=false;
 }
 
 async function decide(chosen,accepted){

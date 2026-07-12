@@ -45,20 +45,30 @@ def _slim(p):
             "allergens": [a.replace("_", " ") for a in p["allergens"]]}
 
 
+def _sim_score(a, b):
+    """Composition + name similarity, the way an embedding recommender clusters
+    products. Products made of the same stuff sit close (almond milk near cashew
+    milk) with zero awareness of who can safely eat them."""
+    s = difflib.SequenceMatcher(None, a["base_name"], b["base_name"]).ratio()
+    s += 2.0 * len(set(a["allergens"]) & set(b["allergens"]))
+    s += 0.3 * len(set(a["ingredients"]) & set(b["ingredients"]))
+    return s
+
+
+def _sim_display(a, b):
+    """A cosine-like 0..1 similarity for display in the RAG view."""
+    name = difflib.SequenceMatcher(None, a["base_name"], b["base_name"]).ratio()
+    ing = len(set(a["ingredients"]) & set(b["ingredients"]))
+    al = len(set(a["allergens"]) & set(b["allergens"]))
+    return round(min(0.98, 0.58 + 0.28 * name + 0.05 * ing + 0.07 * al), 2)
+
+
 def _naive_pick(oos):
-    """Emulates an embedding-similarity engine: clusters by composition, no safety."""
     same_cat = [p for p in catalog if p["category"] == oos["category"]
                 and p["id"] != oos["id"] and p["base_name"] != oos["base_name"]]
     if not same_cat:
         return None
-
-    def score(p):
-        s = difflib.SequenceMatcher(None, oos["base_name"], p["base_name"]).ratio()
-        s += 2.0 * len(set(oos["allergens"]) & set(p["allergens"]))
-        s += 0.3 * len(set(oos["ingredients"]) & set(p["ingredients"]))
-        return s
-
-    return max(same_cat, key=score)
+    return max(same_cat, key=lambda p: _sim_score(oos, p))
 
 
 def _is_unsafe(product, shopper):
@@ -98,6 +108,34 @@ def bootstrap():
         ],
         "products": [_slim(p) for p in catalog],
         "demo_carts": carts,
+    }
+
+
+@app.post("/api/rag-offer")
+def rag_offer(req: OfferRequest):
+    """QuickCart's standard substitution recommender: retrieval by embedding
+    similarity, exactly like a RAG pipeline. Ranks same-category products by how
+    similar they are, with NO model of the shopper's allergies or diet. Returns
+    the nearest matches and flags (for the demo) which ones are actually unsafe,
+    a fact the similarity search itself never checks."""
+    oos = products_by_id[req.product_id]
+    shopper = _shopper(req.shopper_id)
+    same = [p for p in catalog if p["category"] == oos["category"]
+            and p["id"] != oos["id"] and p["base_name"] != oos["base_name"]]
+    ranked = sorted(same, key=lambda p: _sim_score(oos, p), reverse=True)[:3]
+
+    def entry(p):
+        return {**_slim(p), "similarity": _sim_display(oos, p), "unsafe": _is_unsafe(p, shopper),
+                "reason": f"Nearest match to {oos['name']} by embedding similarity"}
+
+    picks = [entry(p) for p in ranked]
+    return {
+        "mode": "rag",
+        "oos": _slim(oos),
+        "best": picks[0] if picks else None,
+        "alternatives": picks[1:],
+        "method": "vector similarity search (RAG)",
+        "checked_count": len(same),
     }
 
 
