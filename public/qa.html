@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ListingIQ - catalog compliance QA</title>
+<meta name="description" content="ListingIQ audits every product listing for undeclared allergens, false diet claims, prohibited marketing claims, and missing mandatory fields. Deterministic detection on a knowledge graph; AI writes the compliant fix.">
+<style>
+  :root{
+    --ink:#1B1F2E;--soft:#5D6374;--faint:#8A8FA3;--line:#E6E7EF;--ground:#F4F5F8;--card:#fff;
+    --accent:#5A4FB5;--accent-dark:#473DA0;--accent-bg:#EFEDF9;
+    --green:#177A42;--green-bg:#E7F4EC;--red:#B3403A;--red-bg:#FAECEB;--amber:#9A5B10;--amber-bg:#FBF0DD;
+    --mono:"Cascadia Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--ground);color:var(--ink);font-size:15px;line-height:1.5}
+  button{font-family:inherit;cursor:pointer}
+  a{color:var(--accent-dark)}
+  .nav{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .nav-in{max-width:1180px;margin:0 auto;padding:12px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;letter-spacing:-.02em}
+  .brand .logo{width:28px;height:28px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:15px;font-weight:800}
+  .brand small{font-weight:600;font-size:10px;color:var(--faint);display:block;margin-top:-3px}
+  .nav .sub{font-size:12.5px;color:var(--soft);border-left:1px solid var(--line);padding-left:14px}
+  .nav .right{margin-left:auto;display:flex;gap:8px}
+  .switch{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:600;color:var(--soft);text-decoration:none}
+  .switch.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  main{max-width:1180px;margin:0 auto;padding:22px 22px 60px}
+  .head h1{font-size:22px;letter-spacing:-.02em}
+  .head p{color:var(--soft);font-size:13.5px;max-width:70ch;margin-top:2px}
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+  @media(max-width:720px){.tiles{grid-template-columns:1fr 1fr}}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
+  .tile .k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+  .tile .v{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-top:3px;font-variant-numeric:tabular-nums}
+  .tile.bad .v{color:var(--red)}.tile.warn .v{color:var(--amber)}.tile.ok .v{color:var(--green)}
+  .tile .n{font-size:11.5px;color:var(--faint);margin-top:1px}
+  .headline{background:var(--accent-bg);border:1px solid #DDD9F2;border-radius:12px;padding:13px 18px;font-size:13.5px;color:var(--accent-dark);margin-bottom:16px}
+  .headline b{font-variant-numeric:tabular-nums}
+  .grid{display:grid;grid-template-columns:420px 1fr;gap:18px;align-items:start}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden}
+  .panel-h{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .panel-h b{font-size:14px}
+  .filters{display:flex;gap:5px;margin-left:auto}
+  .filters button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 10px;font-size:11.5px;font-weight:700;color:var(--soft)}
+  .filters button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .list{max-height:560px;overflow-y:auto}
+  .row{display:flex;align-items:center;gap:11px;padding:10px 16px;border-bottom:1px solid var(--line);cursor:pointer}
+  .row:hover{background:var(--ground)}.row.sel{background:var(--accent-bg)}
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .dot.critical{background:var(--red)}.dot.warning{background:var(--amber)}.dot.pass{background:var(--green)}
+  .row .grow{flex:1;min-width:0}
+  .row .nm{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .tp{font-size:11.5px;color:var(--faint)}
+  .row .sc{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+  .row .sc.critical{color:var(--red)}.row .sc.warning{color:var(--amber)}.row .sc.pass{color:var(--green)}
+  .detail{padding:16px 18px}
+  .empty{padding:70px 20px;text-align:center;color:var(--faint)}
+  .lst{background:var(--ground);border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-bottom:16px}
+  .lst .lt{font-size:14px;font-weight:700}
+  .lst .meta{font-size:12px;color:var(--soft);margin-top:5px;display:flex;flex-wrap:wrap;gap:6px}
+  .kv{background:#fff;border:1px solid var(--line);border-radius:7px;padding:3px 9px;font-size:11.5px}
+  .kv.miss{border-color:#EBC7C4;background:var(--red-bg);color:#7C2D28}
+  .claim{background:#fff;border:1px solid var(--line);border-radius:7px;padding:3px 9px;font-size:11.5px}
+  .claim.bad{border-color:#EBC7C4;background:var(--red-bg);color:#7C2D28;font-weight:600}
+  .scwrap{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .score-ring{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:16px;flex-shrink:0}
+  .finding{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:9px;border-left-width:3px}
+  .finding.critical{border-left-color:var(--red)}.finding.warning{border-left-color:var(--amber)}.finding.info{border-left-color:var(--soft)}
+  .finding .ft{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px}
+  .sev{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em}
+  .sev.critical{background:var(--red-bg);color:var(--red)}.sev.warning{background:var(--amber-bg);color:var(--amber)}.sev.info{background:var(--ground);color:var(--soft)}
+  .rule{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-left:auto}
+  .finding .fd{font-size:12.5px;color:var(--soft);margin-top:5px}
+  .finding .fx{font-size:12px;color:var(--green);margin-top:6px;background:var(--green-bg);border-radius:7px;padding:6px 9px}
+  .finding .fx b{color:var(--green)}
+  .allgood{background:var(--green-bg);border:1px solid #C5E6D2;border-radius:11px;padding:14px;color:#0f5c32;font-size:13px}
+  .fixbtn{border:none;background:var(--accent);color:#fff;border-radius:10px;padding:11px 18px;font-size:13.5px;font-weight:700;margin-top:6px}
+  .fixbtn:hover{background:var(--accent-dark)}.fixbtn:disabled{opacity:.6}
+  .corrected{border:1.5px solid var(--green);border-radius:11px;padding:13px 15px;margin-top:12px;background:var(--green-bg)}
+  .corrected .ct{font-weight:700;font-size:13px;color:#0f5c32;margin-bottom:7px}
+  .corrected .cd{font-size:12.5px;color:var(--ink);background:#fff;border-radius:8px;padding:9px 11px;margin-bottom:8px}
+  .corrected .meta{display:flex;flex-wrap:wrap;gap:6px}
+  .spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:-2px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  footer{border-top:1px solid var(--line);background:var(--card);margin-top:24px}
+  .foot{max-width:1180px;margin:0 auto;padding:14px 22px;font-size:12px;color:var(--faint)}
+</style>
+</head>
+<body>
+<div class="nav"><div class="nav-in">
+  <div class="brand"><span class="logo">L</span><div>ListingIQ<small>catalog compliance QA</small></div></div>
+  <div class="sub">Powered by the SwapIQ knowledge graph</div>
+  <div class="right"><a class="switch" href="/">Store (SwapIQ)</a><a class="switch on" href="/qa.html">Compliance QA</a></div>
+</div></div>
+
+<main>
+  <div class="head">
+    <h1>Every listing, audited before it goes live</h1>
+    <p>Undeclared allergens, false vegan or gluten-free claims, prohibited marketing claims, and missing mandatory fields, caught deterministically on the knowledge graph and cited to the exact rule. The AI only writes the compliant fix.</p>
+  </div>
+  <div class="tiles" id="tiles"></div>
+  <div class="headline" id="headline"></div>
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-h"><b>Listings</b><div class="filters" id="filters">
+        <button data-f="all" class="on">All</button><button data-f="critical">Critical</button><button data-f="warning">Warnings</button><button data-f="pass">Clean</button>
+      </div></div>
+      <div class="list" id="list"></div>
+    </div>
+    <div class="panel"><div class="detail" id="detail"><div class="empty">Select a listing to see its compliance report.</div></div></div>
+  </div>
+</main>
+<footer><div class="foot">ListingIQ and SwapIQ run on one product-safety knowledge graph. Synthetic catalog; detection is real, derived from the same ingredient data.</div></footer>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+let SUMMARY=null, FILTER="all", SELECTED=null;
+
+async function boot(){
+  SUMMARY=await(await fetch("/api/qa-summary")).json();
+  renderTiles();renderList();
+}
+function renderTiles(){
+  const d=SUMMARY;
+  $("#tiles").innerHTML=`
+    <div class="tile"><div class="k">Listings audited</div><div class="v">${d.total}</div></div>
+    <div class="tile bad"><div class="k">With issues</div><div class="v">${d.pct_issues}%</div><div class="n">${d.with_issues} of ${d.total}</div></div>
+    <div class="tile bad"><div class="k">Critical</div><div class="v">${d.critical}</div><div class="n">allergen / false claim / legal</div></div>
+    <div class="tile ok"><div class="k">Clean</div><div class="v">${d.clean}</div></div>`;
+  $("#headline").innerHTML=`<b>${d.pct_issues}%</b> of live listings have a compliance issue the brand did not catch, including <b>${d.critical}</b> critical ones (undeclared allergens, false diet claims, missing FSSAI fields) that risk a takedown, a fine, or a customer safety incident.`;
+}
+function renderList(){
+  const rows=SUMMARY.rows.filter(r=>FILTER==="all"||r.status===FILTER).slice(0,200);
+  $("#list").innerHTML=rows.map(r=>`<div class="row ${SELECTED===r.id?"sel":""}" data-id="${r.id}">
+    <span class="dot ${r.status}"></span>
+    <div class="grow"><div class="nm">${r.name}</div><div class="tp">${r.status==="pass"?"No issues":r.top}${r.critical+r.warning>1?` +${r.critical+r.warning-1} more`:""}</div></div>
+    <div class="sc ${r.status}">${r.score}</div></div>`).join("")||`<div class="empty">No listings in this filter.</div>`;
+  $$("#list .row").forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
+}
+$$("#filters button").forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;$$("#filters button").forEach(x=>x.classList.toggle("on",x===b));renderList()});
+
+async function openDetail(id){
+  SELECTED=id;renderList();
+  $("#detail").innerHTML=`<div class="empty"><span class="spin"></span> Auditing...</div>`;
+  const d=await(await fetch("/api/audit?product_id="+id)).json();
+  const l=d.listing,p=d.product;
+  const ringColor=d.score>=80?"var(--green)":d.score>=50?"var(--amber)":"var(--red)";
+  const declaredMissing=p.true_allergens.filter(a=>!l.declared_allergens.map(x=>x.replace(/_/g," ")).includes(a));
+  const findings=d.findings.length?d.findings.map(f=>`<div class="finding ${f.severity}">
+    <div class="ft"><span class="sev ${f.severity}">${f.severity}</span>${f.title}<span class="rule">${f.rule}</span></div>
+    <div class="fd">${f.detail}</div><div class="fx"><b>Fix:</b> ${f.fix}</div></div>`).join(""):`<div class="allgood">No compliance issues found. This listing is safe to publish.</div>`;
+  $("#detail").innerHTML=`
+    <div class="scwrap"><div class="score-ring" style="background:${ringColor}22;color:${ringColor};border:2px solid ${ringColor}">${d.score}</div>
+      <div><div style="font-weight:700;font-size:15px">${p.name}</div><div style="font-size:12.5px;color:var(--soft)">${p.category} · true allergens: ${p.true_allergens.join(", ")||"none"} · ${p.diet_tags.join(", ")||"no diet tags"}</div></div></div>
+    <div class="lst"><div class="lt">${l.title}</div>
+      <div style="font-size:12px;color:var(--soft);margin-top:4px">${l.description}</div>
+      <div class="meta"><span class="kv">declared: ${l.declared_allergens.map(a=>a.replace(/_/g," ")).join(", ")||"none"}</span>
+        <span class="kv ${l.fssai_license?"":"miss"}">FSSAI: ${l.fssai_license||"MISSING"}</span>
+        <span class="kv ${l.net_quantity?"":"miss"}">net qty: ${l.net_quantity||"MISSING"}</span>
+        <span class="kv ${l.veg_mark===l.veg_mark_correct?"":"miss"}">mark: ${l.veg_mark}</span>
+        <span class="kv">images: ${l.images}</span></div>
+      <div class="meta" style="margin-top:6px">${l.claims.map(c=>`<span class="claim ${["100% natural","chemical free","cures acidity","clinically proven","miracle food","detox","no side effects","boosts immunity","doctor recommended","anti-ageing"].includes(c)||(c==="vegan"&&!p.diet_tags.includes("vegan"))||(c==="gluten free"&&!p.diet_tags.includes("gluten_free"))?"bad":""}">${c}</span>`).join("")}</div></div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:9px">Compliance report</div>
+    ${findings}
+    ${d.findings.length?`<button class="fixbtn" id="fixBtn">Generate compliant listing</button><div id="fixOut"></div>`:""}`;
+  const fb=$("#fixBtn");if(fb)fb.onclick=()=>runFix(id,fb);
+}
+
+async function runFix(id,btn){
+  btn.disabled=true;btn.innerHTML=`<span class="spin"></span> Rewriting...`;
+  const d=await(await fetch("/api/fix",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({product_id:id})})).json();
+  const c=d.corrected;
+  $("#fixOut").innerHTML=`<div class="corrected"><div class="ct">Compliant version ${c.source==="claude"?"(written by Claude)":""}</div>
+    <div class="cd">${c.description}</div>
+    <div class="meta"><span class="kv">declared: ${c.declared_allergens.map(a=>a.replace(/_/g," ")).join(", ")||"none"}</span>
+      <span class="kv">FSSAI: ${c.fssai_license}</span><span class="kv">net qty: ${c.net_quantity}</span>
+      <span class="kv">mark: ${c.veg_mark}</span><span class="kv">claims: ${c.claims.join(", ")||"none"}</span></div></div>`;
+  btn.disabled=false;btn.textContent="Generate compliant listing";
+}
+boot();
+</script>
+</body>
+</html>

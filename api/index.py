@@ -16,10 +16,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from data_gen import generate_catalog, generate_shoppers
+from data_gen import INGREDIENT_ALLERGENS, generate_catalog, generate_shoppers
 from graph_core import (build_graph, edge_weight, explain_paths,
                         safe_candidates, updated_weight)
-from agent import claude_available, rank_and_explain
+from agent import claude_available, get_api_key, rank_and_explain
+import listings as listing_qa
 
 app = FastAPI(title="SwapIQ API")
 
@@ -239,6 +240,100 @@ def graph_view(req: GraphRequest):
         add_node(v, "product", G.nodes[v]["name"])
         edges.append({"from": focus, "to": v, "label": f"SWAP {w:.2f}"})
     return {"nodes": nodes, "edges": edges, "focus": focus}
+
+
+# ---------------- ListingIQ: compliance QA ----------------
+
+_LISTINGS = {p["id"]: listing_qa.generate_listing(p) for p in catalog}
+_AUDITS = {p["id"]: listing_qa.audit(p, _LISTINGS[p["id"]], INGREDIENT_ALLERGENS) for p in catalog}
+
+
+@app.get("/api/qa-summary")
+def qa_summary():
+    """Catalog-wide QA scoreboard: how many listings have issues, by severity."""
+    rows, crit, warn, clean = [], 0, 0, 0
+    for p in catalog:
+        findings, score = _AUDITS[p["id"]]
+        status = listing_qa.status_of(findings)
+        if status == "critical":
+            crit += 1
+        elif status == "warning":
+            warn += 1
+        else:
+            clean += 1
+        rows.append({
+            "id": p["id"], "name": p["name"], "category": p["category"].replace("_", " "),
+            "status": status, "score": score,
+            "critical": sum(1 for f in findings if f["severity"] == "critical"),
+            "warning": sum(1 for f in findings if f["severity"] == "warning"),
+            "top": findings[0]["title"] if findings else "Clean",
+        })
+    total = len(catalog)
+    with_issues = crit + warn
+    return {"total": total, "with_issues": with_issues, "critical": crit, "warning": warn,
+            "clean": clean, "pct_issues": round(with_issues / total * 100) if total else 0, "rows": rows}
+
+
+@app.get("/api/audit")
+def audit_one(product_id: str):
+    p = products_by_id[product_id]
+    listing = _LISTINGS[product_id]
+    findings, score = _AUDITS[product_id]
+    return {
+        "product": {"id": p["id"], "name": p["name"], "category": p["category"].replace("_", " "),
+                    "ingredients": [i.replace("_", " ") for i in p["ingredients"]],
+                    "true_allergens": [a.replace("_", " ") for a in p["allergens"]],
+                    "diet_tags": p["diet_tags"]},
+        "listing": listing, "findings": findings, "score": score,
+        "status": listing_qa.status_of(findings)}
+
+
+class FixRequest(BaseModel):
+    product_id: str
+
+
+@app.post("/api/fix")
+def fix_listing(req: FixRequest):
+    """LLM rewrites a compliant listing. Deterministic fallback if no key."""
+    p = products_by_id[req.product_id]
+    listing = _LISTINGS[req.product_id]
+    findings, _ = _AUDITS[req.product_id]
+    corrected = {
+        "declared_allergens": sorted(p["allergens"]),
+        "claims": [c for c in listing["claims"]
+                   if c not in listing_qa.PROHIBITED_CLAIMS
+                   and not (c == "vegan" and "vegan" not in p["diet_tags"])
+                   and not (c == "gluten free" and "gluten_free" not in p["diet_tags"])
+                   and not (c == "sugar free" and "sugar" in p["ingredients"])],
+        "net_quantity": listing["net_quantity"] or listing_qa.PACK.get(p["category"], "1 unit"),
+        "fssai_license": listing["fssai_license"] or "10012345000123",
+        "veg_mark": listing["veg_mark_correct"]}
+    key = get_api_key()
+    rewrite = None
+    if key and findings:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=key)
+            prompt = (
+                "You are a marketplace compliance editor. Rewrite this grocery listing so it is fully "
+                "compliant: declare all allergens, drop false or prohibited claims, keep it honest and "
+                "appealing. Return ONLY the corrected description, 2 short sentences.\n\n"
+                f"Product: {p['name']}\nTrue ingredients: {', '.join(p['ingredients'])}\n"
+                f"True allergens: {', '.join(p['allergens']) or 'none'}\nDiet: {', '.join(p['diet_tags'])}\n"
+                f"Violations: {'; '.join(f['title'] for f in findings)}")
+            resp = client.messages.create(model="claude-opus-4-8", max_tokens=300,
+                                          messages=[{"role": "user", "content": prompt}])
+            if resp.stop_reason != "refusal":
+                rewrite = next((b.text for b in resp.content if b.type == "text"), None)
+        except Exception:
+            rewrite = None
+    if not rewrite:
+        rewrite = (f"{p['name']}. "
+                   f"{'Contains ' + ', '.join(a.replace('_', ' ') for a in p['allergens']) + '. ' if p['allergens'] else ''}"
+                   "Delivered fresh from QuickCart in minutes.")
+    corrected["description"] = rewrite
+    corrected["source"] = "claude" if (key and findings) else "fallback"
+    return {"corrected": corrected}
 
 
 # Local development only: serve the frontend. On Vercel, static files are
