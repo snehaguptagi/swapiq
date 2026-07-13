@@ -1,50 +1,152 @@
 # SwapIQ: Product Requirements Document
 
-GenAI Hackathon, Retail and Consumer Goods track. July 2026.
+Version 2.0 - July 2026
+Retail and Consumer Goods / Commerce Infrastructure
 
-## 1. Problem statement
+## 1. Product vision
 
-A knowledge graph powered substitution intelligence agent for grocery ecommerce that models products, ingredients, allergens, dietary rules and shopper preferences as a graph, guarantees constraint-safe substitutes for out-of-stock items through graph traversal, uses GenAI to rank and explain each swap with cited graph paths, and learns from every accept or reject decision.
+SwapIQ is the product-safety knowledge graph for commerce. It converts catalog data into verified relationships between products, ingredients, allergens, dietary rules and shopper constraints, then powers multiple operational workflows from that shared graph.
 
-## 2. The problem, from first principles
+The customer-facing wedge is safe out-of-stock substitution. The broader platform automates product-safety work that ecommerce brands and retailers otherwise perform manually: catalog QA, listing compliance, recall propagation and shopper-safe discovery.
 
-**Fact 1. Stockouts after ordering are structural in quick commerce.** Ten-minute delivery requires small dark stores whose inventory changes faster than any stock counter can track. Replenishment cycles run 24 to 48 hours and availability in fresh categories sits below 75 percent across major Indian platforms. 7 to 10 percent of order lines are out of stock at pick time. This cannot be prevented; only the response to it can improve.
+## 2. Problem statement
 
-**Fact 2. The current response destroys value on both sides.** Three out of four times the customer gets a silent refund. The retailer loses revenue it already paid delivery costs for. About 90 percent of shoppers have at least one item they will not compromise on, and failing it sends them to a competitor app that is 30 seconds away.
+Commerce platforms increasingly use AI to make catalog and fulfillment decisions, but similarity models do not understand safety or compliance. Almond milk and cashew milk may be close in embedding space while both are unsafe for a shopper with a tree-nut allergy. A listing can sound persuasive while omitting a mandatory allergen declaration. A recalled ingredient can appear across hundreds of SKUs that an operations team must find manually.
 
-**Fact 3. Similarity is not substitutability.** Current systems pick substitutes by text or embedding similarity. Almond milk and cashew milk are nearly identical in embedding space; for a nut-allergic customer one of them is dangerous. Whether a product can replace another depends on relationships (ingredients, allergens, diets, price, usage), which similarity scores discard.
+These failures create refunds, churn, marketplace suppression, regulatory exposure and customer harm. The system needs a deterministic safety layer before generative AI is allowed to rank or write.
 
-**Therefore:** model the relationships explicitly in a knowledge graph. Hard constraints are enforced by graph traversal before any AI runs, so an unsafe suggestion is structurally impossible. The LLM adds judgment (which safe option fits best) and language (the one-line reason that makes a customer tap yes). Every decision feeds back into the graph.
+## 3. Product surfaces
 
-## 3. Users
-
-| User | Need | Surface |
+| Surface | Primary user | Job to be done |
 |---|---|---|
-| Shopper | A safe, sensible replacement with an honest reason, decided in one tap | Swap offer in the order flow |
-| Category manager | Acceptance rate, revenue retained vs refunded, failing SKUs | Session stats and decision log |
-| Platform engineering | A drop-in service that consumes events they already produce | One API call: POST /api/swap-offer |
+| QuickCart storefront | Shopper | Search, browse, build a cart and check out from a complete quick-commerce experience |
+| SwapIQ substitution | Shopper / fulfillment team | Resolve a post-order stockout with a safe, sensible replacement and a clear explanation |
+| SwapIQ Console | Ecommerce operations | Connect a catalog, inspect graph coverage, monitor applications and trigger recall analysis |
+| ListingIQ | Catalog and compliance teams | Audit listings, cite violations and generate a compliant correction |
+| Safe Search | Shopper / retailer | Filter the catalog to products verified against the current shopper profile |
+| Recall propagation | Safety and operations teams | Trace one affected ingredient to every linked SKU, listing, category and at-risk shopper |
 
-## 4. Scope
+## 4. Target users and buyers
 
-**In scope (hackathon):** synthetic catalog of about 200 SKUs with ingredient-derived allergens and diet tags; three demo shopper personas; knowledge graph safety filtering; Claude ranking with structured output and a deterministic fallback; learning loop; live web demo with ambient business impact; comparison against a similarity-only baseline.
+- Shoppers with allergies, dietary constraints or strong product preferences.
+- Ecommerce and quick-commerce operations teams responsible for fulfillment and catalog quality.
+- Food, supplement and regulated-category brands selling across several marketplaces.
+- Retail platform engineering teams that want an API rather than a new commerce stack.
+- Compliance and product-safety teams that need cited, repeatable checks.
 
-**Out of scope:** real inventory or payment integration, mobile app, production Neo4j deployment, authentication.
+The initial buyer is a mid-market retailer or D2C brand that cannot justify building a product-safety graph internally. The value metric is revenue recovered, listings protected and manual review time avoided.
 
-## 5. Success metrics
+## 5. Current scope
 
-1. **Demo:** a stockout resolves into an accepted safe substitution end to end in under 5 seconds, with a cited explanation.
-2. **Safety:** zero constraint-violating suggestions, provable by construction: unsafe products never reach the LLM.
-3. **Business:** the demo computes revenue retained vs refunded live, and projects it at retailer scale with an open formula.
+### Implemented
 
-## 6. Business case
+- Full responsive quick-commerce storefront with hero campaigns, 24 categories, search, product rails, profile selection, cart, checkout and order confirmation.
+- Deterministic synthetic catalog with 508 SKUs, 12 brands and ingredient-derived allergens and diet tags.
+- Four shopper profiles covering nut, gluten, egg and sesame constraints plus budget sensitivity.
+- Similarity-only RAG baseline for an explicit A/B comparison.
+- Knowledge-graph safety traversal before ranking.
+- Claude ranking and explanation with a deterministic fallback.
+- Accept/refund learning loop stored per browser session.
+- Safe-for-me catalog filtering and cart-level safety audit.
+- ListingIQ audit library for allergens, claims, required fields, dietary marks and listing completeness.
+- AI-assisted compliant listing rewrite.
+- Operator console with platform metrics, graph explorer, simulated store connection and recall propagation.
+- Neo4j loader and Cypher examples for the production database path.
 
-At a 10 percent stockout rate, every percentage point of substitution acceptance is refund revenue recovered plus a churn event avoided. Example at defaults (1,500 orders per day per store, 8 percent stockout, Rs. 150 average item, 70 percent acceptance): about Rs. 12,600 recovered per store per day, roughly Rs. 46 lakh per store per year, over Rs. 900 crore per year across a 2,000 store network. Published research: substitution acceptance improves from 66 percent (random) to 75 percent or more with personalised, constraint-aware suggestions.
+### Not yet productionized
 
-## 7. Key risks and mitigations
+- Live retailer catalog, inventory, payment or marketplace integrations.
+- Authentication, tenant isolation, persistent server-side learning and role-based access control.
+- Continuous marketplace policy synchronization.
+- Production Neo4j connection in the deployed API. The running demo uses NetworkX in memory.
+- Human approval workflow, audit-log retention and regulatory certification.
+
+## 6. Core user journeys
+
+### Safe stockout resolution
+
+1. A shopper checks out with a constrained profile.
+2. The picker reports an ordered SKU as out of stock.
+3. The graph scans same-category candidates and removes allergen, diet and budget conflicts.
+4. Claude receives only safe candidates, ranks them and writes a one-line reason.
+5. The shopper accepts the replacement or requests a refund.
+6. The decision updates the learned swap confidence.
+
+### Listing compliance QA
+
+1. A catalog team opens the 508-listing test suite.
+2. ListingIQ scores each listing and groups critical, warning and clean results.
+3. A reviewer opens a finding and sees severity, rule, evidence and prescribed fix.
+4. The system generates a corrected listing for human approval.
+
+### Recall propagation
+
+1. A supplier or safety team flags an ingredient.
+2. The console traverses linked products, categories, listings and allergen relationships.
+3. The operator receives the affected SKU count, product list and at-risk shopper profiles.
+
+## 7. Functional requirements
+
+### Storefront
+
+- Render all 24 categories and at least 500 products without a build step.
+- Support responsive desktop and mobile layouts without horizontal page overflow.
+- Support search, category navigation, quantity controls, cart totals and checkout.
+- Preserve the RAG-to-SwapIQ comparison as an unobtrusive demo control.
+
+### Safety engine
+
+- Never send a graph-blocked candidate to the LLM.
+- Return a cited reason for every blocked candidate.
+- Return a deterministic answer when Claude is unavailable or invalid.
+- Keep learned weights bounded between 0 and 1.
+
+### ListingIQ
+
+- Audit every catalog listing against deterministic rules.
+- Expose score, severity, rule ID, evidence and fix.
+- Use the LLM only for rewriting, not for deciding whether a deterministic rule passed.
+
+### Console and recall
+
+- Report catalog, graph and listing-QA metrics from live API data.
+- Visualize a product-centered graph.
+- Return recall impact from a focused ingredient query.
+
+## 8. Success metrics
+
+| Area | Metric |
+|---|---|
+| Safety | Zero constraint-violating candidates after graph filtering |
+| Substitution | Acceptance rate and revenue retained per 100 stockouts |
+| Performance | Graph filtering measured in milliseconds; complete offer remains usable with fallback |
+| Compliance | Critical issues detected, false-positive rate and review time saved per listing |
+| Recall | Time to identify all linked SKUs compared with a manual catalog sweep |
+| Product | Search-to-cart, cart-to-checkout and successful end-to-end demo completion |
+
+## 9. Business model and go-to-market
+
+The initial product is a B2B API and operations console priced by catalog size, audited listing volume and substitution events. The first design partner should be a food or supplement brand selling across at least three channels, where listing compliance and ingredient quality already have an owner and budget.
+
+The expansion path is one graph powering several applications: substitution, safe search, compliance, recall and eventually regulated-category workflows. The defensible asset is the verified catalog graph plus accumulated acceptance and rule-performance data, not model access.
+
+## 10. Risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Missing or wrong ingredient data | Fail safe: a product with unknown ingredients is never offered to a constrained shopper; flagged to catalog ops |
-| LLM latency or outage during demo | Deterministic fallback ranker produces the same response shape |
-| Cold start (no acceptance history) | SWAP confidence seeded from attribute similarity priors; learning takes over immediately |
-| Judges question data realism | Allergens and diet tags are derived from ingredient lists, never hand-assigned; FSSAI labels carry this data in production |
+| Missing or wrong ingredient data | Fail closed for constrained shoppers and flag incomplete catalog records |
+| LLM latency, outage or invalid output | Deterministic fallback with the same response contract |
+| False confidence from synthetic data | Present data as synthetic and validate with a design partner's real catalog before commercial claims |
+| Marketplace policies change | Versioned policy packs with rule source and effective date |
+| Feature copied by a large retailer | Sell multi-tenant infrastructure to the long tail and compound the cross-workflow graph asset |
+| Neo4j presented as live when it is not | State clearly that the demo uses NetworkX and the repository contains the tested migration path |
+
+## 11. Release acceptance criteria
+
+- 508 products and 24 categories load from `/api/bootstrap`.
+- Storefront search, category browsing, cart and checkout work on desktop and mobile.
+- The seeded hero journey shows the unsafe RAG cashew-milk recommendation, then a safe SwapIQ oat-milk replacement.
+- Accepting the substitute updates the cart and allows order completion.
+- ListingIQ audits all 508 listings and exposes detailed findings.
+- Console metrics, recall endpoint and graph explorer render without browser errors.
+- README, PRD, LLD and Neo4j setup accurately match the shipped implementation.

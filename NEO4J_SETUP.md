@@ -37,7 +37,7 @@ python neo4j_loader.py --demo
 Expected output:
 
 ```
-Loaded: 195 products, N ingredients, N allergens
+Loaded: 508 products, N ingredients, N allergens
 
 Safe substitutes for a nut-allergic vegan shopper (almond milk out of stock):
   SAFE  ... Oat Milk ...

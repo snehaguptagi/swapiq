@@ -18,19 +18,22 @@ Embedding-based recommenders think almond milk and cashew milk are nearly identi
 
 ## Live demo
 
-The site is a single-screen live demo. Pick a shopper, mark an item out of stock, and watch the pipeline run: graph filter, Claude ranking, one-tap decision. Session impact (acceptance rate, revenue retained, projection at retail scale) accumulates ambiently in the header as you use it.
+The customer surface is a full quick-commerce storefront: campaign banners, 24 image-led categories, search, 500+ products, cart, safety audit, checkout and order confirmation. The default demo cart creates a realistic stockout during checkout so the standard similarity result can be compared with SwapIQ's graph-safe replacement. A separate operator console and listing-compliance QA surface expose the platform behind the store.
 
 ## Architecture
 
 ```
 public/index.html      Frontend: vanilla HTML/CSS/JS, no build step
+public/console.html    Operator console, recall propagation and graph explorer
+public/qa.html         ListingIQ catalog compliance QA
 api/index.py           FastAPI service (Vercel serverless compatible)
-api/data_gen.py        Synthetic catalog: ~200 SKUs; allergens and diet
+api/data_gen.py        Synthetic catalog: 500+ SKUs; allergens and diet
                        tags derived from ingredient lists, never hand-set
 api/graph_core.py      NetworkX knowledge graph, safety traversal,
                        pure learning function
 api/agent.py           Claude ranking (structured JSON output) with a
                        deterministic fallback when no API key is set
+api/listings.py        Listing generator and deterministic compliance rules
 ```
 
 The API is stateless: learned swap confidence and the decision log live in the browser (localStorage) and are passed per request, so the serverless deployment needs no database. In production the same schema moves to Neo4j and the learning state to the retailer's store.
@@ -50,10 +53,11 @@ Deployed on Vercel. `vercel.json` routes `/api/*` to the FastAPI serverless func
 
 ## Neo4j (production graph)
 
-The demo runs on an in-memory NetworkX graph. The same schema loads unchanged
-into Neo4j, the production graph database: see [NEO4J_SETUP.md](NEO4J_SETUP.md)
-and `neo4j_loader.py`, which loads the catalog and runs the safety traversal as
-Cypher.
+The running demo uses an in-memory NetworkX graph; it does not require or query
+Neo4j. The same schema loads into Neo4j for the production path: see
+[NEO4J_SETUP.md](NEO4J_SETUP.md) and `neo4j_loader.py`, which load the catalog
+and run the safety traversal as Cypher. Describe the current build as
+**Neo4j-ready**, not Neo4j-powered.
 
 ## Documentation
 

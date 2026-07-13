@@ -43,8 +43,10 @@ def _shopper(shopper_id):
 
 def _slim(p):
     return {"id": p["id"], "name": p["name"], "price": p["price"],
+            "brand": p["brand"], "base_name": p["base_name"],
             "category": p["category"].replace("_", " "),
-            "allergens": [a.replace("_", " ") for a in p["allergens"]]}
+            "allergens": [a.replace("_", " ") for a in p["allergens"]],
+            "diet_tags": p["diet_tags"]}
 
 
 def _sim_score(a, b):
@@ -334,6 +336,33 @@ def fix_listing(req: FixRequest):
     corrected["description"] = rewrite
     corrected["source"] = "claude" if (key and findings) else "fallback"
     return {"corrected": corrected}
+
+
+@app.get("/api/recall")
+def recall(ingredient: str):
+    """Recall propagation: one traversal finds every SKU, listing, and at-risk
+    shopper linked to a recalled ingredient. The graph does in milliseconds what
+    a manual catalog sweep takes days to do."""
+    key = ingredient.replace(" ", "_")
+    aff = [p for p in catalog if key in p["ingredients"]]
+    allergen = INGREDIENT_ALLERGENS.get(key)
+    cats = sorted({p["category"].replace("_", " ") for p in aff})
+    at_risk = [s["name"] for s in shoppers if allergen and allergen in s["avoids_allergens"]]
+    return {"ingredient": ingredient.replace("_", " "),
+            "allergen": (allergen or "none").replace("_", " "),
+            "sku_count": len(aff), "categories": cats,
+            "skus": [p["name"] for p in aff[:14]],
+            "listing_count": len(aff), "shoppers_at_risk": at_risk}
+
+
+@app.get("/api/platform")
+def platform():
+    """Platform-level snapshot for the operator console."""
+    qa = qa_summary()
+    return {"products": len(catalog), "categories": len({p["category"] for p in catalog}),
+            "graph_nodes": G.number_of_nodes(), "graph_edges": G.number_of_edges(),
+            "listings_audited": qa["total"], "listings_with_issues": qa["with_issues"],
+            "critical": qa["critical"], "shoppers": len(shoppers)}
 
 
 # Local development only: serve the frontend. On Vercel, static files are
