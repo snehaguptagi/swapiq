@@ -47,6 +47,18 @@
   .nav-search{max-width:1140px;margin:0 auto;padding:0 22px 11px}
   .nav-search input{width:100%;padding:11px 16px;border:1px solid rgba(0,0,0,.08);border-radius:12px;font-family:inherit;font-size:13.5px;background:#fff}
   .nav-search input:focus{outline:none;border-color:var(--ink)}
+  @media(max-width:640px){
+    .nav-top{gap:9px;padding:9px 14px}
+    .deliv{display:none}
+    .brand{font-size:16px}.brand small{display:none}
+    .acct .who{display:none}.acct{padding:6px}
+    .swiq-lab{display:none}
+    .nav-search{padding:0 14px 10px}
+    main{padding:14px 14px 90px}
+    .banner{padding:14px 16px}.banner h1{font-size:16px}
+    .rail-head b{font-size:15px}
+    .foot{flex-direction:column;gap:8px}.foot .links{margin-left:0;flex-wrap:wrap}
+  }
 
   main{max-width:1140px;margin:0 auto;padding:16px 22px 90px}
 
@@ -98,6 +110,49 @@
   .cartbar-in{max-width:1096px;width:100%;background:var(--qc);color:#fff;border-radius:13px;padding:11px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 8px 26px rgba(12,131,31,.32)}
   .cb-left b{font-size:14px}.cb-left span{font-size:12px;opacity:.9;margin-left:8px}
   .cb-btn{border:none;background:#fff;color:var(--qc-dark);border-radius:9px;padding:9px 18px;font-size:13.5px;font-weight:800}
+  /* cart drawer */
+  .drawer-back{position:fixed;inset:0;background:rgba(20,22,40,.42);z-index:55;opacity:0;pointer-events:none;transition:opacity .2s}
+  .drawer-back.show{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:400px;max-width:90vw;background:#fff;z-index:56;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 40px rgba(20,22,40,.18)}
+  .drawer.show{transform:none}
+  .drawer-h{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line);font-size:15px}
+  .drawer-h button{border:none;background:none;font-size:22px;color:var(--faint);line-height:1}
+  .drawer-body{flex:1;overflow-y:auto;padding:8px 18px}
+  .drow{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .th{border-radius:9px;display:grid;place-items:center;flex-shrink:0}
+  .drow .th{width:44px;height:44px}
+  .drow .grow{flex:1;min-width:0}.drow .nm{font-size:13px;font-weight:600}.drow .pr{font-size:12px;color:var(--faint)}
+  .qstep{display:flex;align-items:center;gap:6px;border:1px solid var(--qc);border-radius:8px;padding:3px 6px;color:var(--qc-dark);font-weight:700;font-size:13px}
+  .qstep button{border:none;background:none;color:var(--qc-dark);font-size:16px;font-weight:800;line-height:1;cursor:pointer}
+  .drawer-empty{text-align:center;color:var(--faint);padding:60px 20px;font-size:13.5px}
+  .drawer-foot{border-top:1px solid var(--line);padding:16px 18px}
+  .drow-tot{display:flex;justify-content:space-between;font-weight:800;font-size:16px;margin-bottom:12px}
+  .drawer-cta{width:100%;border:none;background:var(--qc);color:#fff;border-radius:11px;padding:13px;font-size:15px;font-weight:700}
+  .drawer-cta:hover{background:var(--qc-dark)}.drawer-cta:disabled{opacity:.5}
+  /* checkout */
+  .co-grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start;margin-top:8px}
+  @media(max-width:820px){.co-grid{grid-template-columns:1fr}}
+  .co-main{display:flex;flex-direction:column;gap:14px}
+  .co-card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px 17px}
+  .co-h{font-size:13px;font-weight:700;margin-bottom:10px}
+  .co-addr{font-size:12.5px;color:var(--soft);line-height:1.6}
+  .pay{display:block;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer}
+  .pay:last-child{border-bottom:none}
+  .co-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .co-item:last-child{border-bottom:none}
+  .th.sm{width:36px;height:36px}.co-item .grow{flex:1}.co-item .nm{font-weight:600}.co-item .pr{font-size:11.5px;color:var(--faint)}
+  .co-side{position:sticky;top:130px}
+  .bill{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;color:var(--soft)}
+  .bill.tot{font-weight:800;font-size:16px;color:var(--ink);border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
+  .place-final{width:100%;border:none;background:var(--qc);color:#fff;border-radius:11px;padding:13px;font-size:15px;font-weight:700;margin-top:12px}
+  .place-final:hover{background:var(--qc-dark)}
+  .co-note{font-size:11.5px;color:var(--faint);text-align:center;margin-top:8px}
+  /* micro-interactions */
+  @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+  .cart-pill .count.bump{animation:pop .32s ease}
+  .skel{background:linear-gradient(90deg,#eee 25%,#f5f5f7 37%,#eee 63%);background-size:400% 100%;animation:sh 1.2s infinite;border-radius:8px}
+  @keyframes sh{0%{background-position:100% 0}100%{background-position:-100% 0}}
+  @media(prefers-reduced-motion:reduce){.cart-pill .count.bump,.skel{animation:none}}
 
   /* ---- the moment (unchanged logic) ---- */
   .moment-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
@@ -230,9 +285,14 @@
       </div>
     </div>
   </div>
+
+  <!-- CHECKOUT -->
+  <div id="view-checkout" class="hidden"></div>
 </main>
 
 <div class="cartbar" id="cartbar"></div>
+<div class="drawer-back" id="drawerBack"></div>
+<aside class="drawer" id="drawer"></aside>
 
 <footer><div class="foot">
   <span>QuickCart is a fictional store with synthetic data. The intelligence is SwapIQ.</span>
@@ -276,10 +336,31 @@ const packOf=p=>PACK[p.category.replace(/ /g,"_")]||"1 unit";
 function mrpOf(p){let h=0;for(const c of p.id)h=(h*31+c.charCodeAt(0))%100;const disc=8+h%18;return Math.round(p.price/(1-disc/100))}
 function profileText(s){const b=[];if(s.avoids.length)b.push("avoids "+s.avoids.join(", "));if(s.diet.length)b.push(s.diet.join(", "));if(s.budget_sensitive)b.push("budget conscious");return b.join(", ")||"no restrictions"}
 const isUnsafe=p=>{const s=shopper();return p.allergens.some(a=>s.avoids.includes(a))};
+function hexToRgba(h,a){const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`}
+const tint=c=>hexToRgba(catColor(c),0.13);
+const SHAPES={
+  carton:'<path d="M13 17 L20 11 L27 17 L27 31 L13 31 Z"/><path d="M13 17 H27"/>',
+  bottle:'<path d="M17 9 h6 v3 l2 4 v15 h-10 v-15 l2 -4 z"/><path d="M17 16 h6"/>',
+  jar:'<rect x="12" y="15" width="16" height="17" rx="2"/><path d="M14 15 v-3 h12 v3"/>',
+  box:'<rect x="11" y="12" width="18" height="20" rx="2"/><path d="M11 19 H29"/>',
+  loaf:'<path d="M10 25 q0 -11 10 -11 q10 0 10 11 v6 h-20 z"/>',
+  cup:'<path d="M14 15 h12 l-1.5 17 h-9 z"/><path d="M13 15 h14"/>',
+  packet:'<path d="M13 13 h14 v19 h-14 z"/><path d="M13 13 l3 -3 h8 l3 3"/>',
+  bag:'<path d="M14 15 q6 -4 12 0 v13 q-6 3 -12 0 z"/><path d="M14 15 l-1 -4 h14 l-1 4"/>',
+  apple:'<circle cx="20" cy="23" r="8.5"/><path d="M20 14.5 v-3.5 q3 -1 4 1"/>',
+  egg:'<ellipse cx="20" cy="22" rx="7.5" ry="10"/>',
+  bar:'<rect x="12" y="15" width="16" height="13" rx="2"/><path d="M20 15 v13 M12 21.5 h16"/>'
+};
+const CAT_SHAPE={plant_milk:'carton',dairy_milk:'carton',yogurt:'cup',dairy_alternatives:'box',cheese:'box',
+  bread:'loaf',pasta:'box',noodles:'packet',spreads:'jar',snacks:'packet',biscuits:'packet',chocolate:'bar',
+  staples:'bag',pulses_dal:'bag',tea_coffee:'cup',breakfast:'box',sauces:'bottle',frozen:'box',dry_fruits:'bag',
+  fruits_veg:'apple',eggs:'egg',beverages:'bottle',health:'jar',baby:'bottle'};
+function productIcon(p,size){size=size||'70%';return `<svg viewBox="0 0 40 40" width="${size}" height="${size}" fill="none" stroke="${catColor(p.category)}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round">${SHAPES[CAT_SHAPE[p.category]||'box']}</svg>`}
 function cartCount(){return Object.values(state.cart).reduce((a,b)=>a+b,0)}
 function cartTotal(){return Object.entries(state.cart).reduce((a,[id,q])=>a+product(id).price*q,0)}
 
 async function boot(){
+  skeletonHome();
   state.data=await(await fetch("/api/bootstrap")).json();
   seedCart();renderAcct();renderToggle();renderHome();renderCartBar();renderCartCount();renderGraphSelect();
 }
@@ -324,7 +405,7 @@ function renderHome(){
 function cardHTML(p){
   const q=state.cart[p.id]||0,u=isUnsafe(p),mrp=mrpOf(p),disc=Math.round((mrp-p.price)/mrp*100);
   return `<div class="pcard">${disc>0?`<div class="ribbon">${disc}% OFF</div>`:""}
-    <div class="pimg" style="background:${catColor(p.category)}">${initials(p.name)}</div>
+    <div class="pimg" style="background:${tint(p.category)}">${productIcon(p)}</div>
     <div class="ptime"><span class="clk"></span> 8 MINS</div>
     <div class="pname">${p.name}</div>
     <div class="ppack">${packOf(p)}</div>
@@ -333,23 +414,75 @@ function cardHTML(p){
       ${q?`<div class="padd on"><button data-dec="${p.id}">-</button>${q}<button data-inc="${p.id}">+</button></div>`:`<button class="padd" data-add="${p.id}">ADD</button>`}</div></div>`;
 }
 function bindGrid(){
-  $$("#home [data-add]").forEach(b=>b.onclick=()=>{state.cart[b.dataset.add]=1;renderHome();renderCartBar();renderCartCount()});
+  $$("#home [data-add]").forEach(b=>b.onclick=()=>{const p=product(b.dataset.add);state.cart[b.dataset.add]=1;renderHome();renderCartBar();renderCartCount();bump();toast(`${p.name} added`)});
   $$("#home [data-inc]").forEach(b=>b.onclick=()=>{state.cart[b.dataset.inc]++;renderHome();renderCartBar();renderCartCount()});
   $$("#home [data-dec]").forEach(b=>b.onclick=()=>{const id=b.dataset.dec;state.cart[id]--;if(state.cart[id]<=0)delete state.cart[id];renderHome();renderCartBar();renderCartCount()});
 }
 $("#search").addEventListener("input",e=>{state.q=e.target.value;renderHome()});
 $("#cartPill").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
 function renderCartCount(){$("#cartCount").textContent=cartCount()}
+function bump(){const c=$("#cartCount");c.classList.remove("bump");void c.offsetWidth;c.classList.add("bump")}
+function skeletonHome(){$("#home").innerHTML=`<div class="skel" style="height:70px;margin-bottom:16px"></div><div style="display:flex;gap:14px;margin-bottom:18px">${'<div class="skel" style="width:56px;height:56px;border-radius:16px"></div>'.repeat(8)}</div>${'<div class="skel" style="height:20px;width:180px;margin-bottom:10px"></div><div style="display:flex;gap:12px;margin-bottom:22px">'+'<div class="skel" style="min-width:162px;height:200px"></div>'.repeat(6)+'</div>'}`}
 function renderCartBar(){
   const n=cartCount(),bar=$("#cartbar");
   if(!n){bar.classList.remove("show");return}
   bar.classList.add("show");
-  bar.innerHTML=`<div class="cartbar-in"><div class="cb-left"><b>${n} item${n>1?"s":""}</b><span>Rs. ${cartTotal()}</span></div><button class="cb-btn" id="placeBtn">Place order &rarr;</button></div>`;
-  $("#placeBtn").onclick=placeOrder;
+  bar.innerHTML=`<div class="cartbar-in"><div class="cb-left"><b>${n} item${n>1?"s":""}</b><span>Rs. ${cartTotal()}</span></div><button class="cb-btn" id="viewCartBtn">View cart &rarr;</button></div>`;
+  $("#viewCartBtn").onclick=openCart;
+}
+
+/* ---- cart drawer ---- */
+function openCart(){renderCartDrawer();$("#drawer").classList.add("show");$("#drawerBack").classList.add("show")}
+function closeCart(){$("#drawer").classList.remove("show");$("#drawerBack").classList.remove("show")}
+$("#drawerBack").onclick=closeCart;
+$("#cartPill").onclick=()=>cartCount()?openCart():window.scrollTo({top:0,behavior:"smooth"});
+function renderCartDrawer(){
+  const ids=Object.keys(state.cart);
+  $("#drawer").innerHTML=`
+    <div class="drawer-h"><b>Your cart</b><button id="closeCart">&times;</button></div>
+    <div class="drawer-body">${ids.length?ids.map(id=>{const p=product(id),q=state.cart[id];
+      return `<div class="drow"><div class="th" style="background:${tint(p.category)}">${productIcon(p,'80%')}</div>
+        <div class="grow"><div class="nm">${p.name}</div><div class="pr">Rs. ${p.price}</div></div>
+        <div class="qstep"><button data-dec="${id}">-</button><span>${q}</span><button data-inc="${id}">+</button></div></div>`;}).join(""):`<div class="drawer-empty">Your cart is empty.</div>`}</div>
+    <div class="drawer-foot"><div class="drow-tot"><span>Total</span><span>Rs. ${cartTotal()}</span></div>
+      <button class="drawer-cta" id="toCheckout" ${ids.length?"":"disabled"}>Proceed to checkout</button></div>`;
+  $("#closeCart").onclick=closeCart;
+  const tc=$("#toCheckout");if(tc)tc.onclick=()=>{closeCart();renderCheckout();setView("checkout")};
+  $$("#drawer [data-inc]").forEach(b=>b.onclick=()=>{state.cart[b.dataset.inc]++;renderCartDrawer();renderCartBar();renderCartCount()});
+  $$("#drawer [data-dec]").forEach(b=>b.onclick=()=>{const id=b.dataset.dec;state.cart[id]--;if(state.cart[id]<=0)delete state.cart[id];renderCartDrawer();renderCartBar();renderCartCount();renderHome()});
+}
+
+/* ---- checkout ---- */
+function renderCheckout(){
+  const ids=Object.keys(state.cart),sub=cartTotal(),fee=sub>199?0:25;
+  $("#view-checkout").innerHTML=`
+    <button class="backbtn" id="coBack">&larr; Back to store</button>
+    <div class="co-grid">
+      <div class="co-main">
+        <div class="co-card"><div class="co-h">Delivery address</div>
+          <div class="co-addr"><b>${shopper().name.split(" (")[0]}'s Home</b><br>402, Prestige Apartments, HSR Layout, Bengaluru 560102<br>Phone: +91 98xxx xxx21</div></div>
+        <div class="co-card"><div class="co-h">Payment method</div>
+          <label class="pay"><input type="radio" name="pay" checked> UPI (Google Pay / PhonePe)</label>
+          <label class="pay"><input type="radio" name="pay"> Credit / Debit card</label>
+          <label class="pay"><input type="radio" name="pay"> Cash on delivery</label></div>
+        <div class="co-card"><div class="co-h">Items (${ids.length})</div>
+          ${ids.map(id=>{const p=product(id);return `<div class="co-item"><div class="th sm" style="background:${tint(p.category)}">${productIcon(p,'78%')}</div><div class="grow"><div class="nm">${p.name}</div><div class="pr">Qty ${state.cart[id]}</div></div><div>Rs. ${p.price*state.cart[id]}</div></div>`}).join("")}</div>
+      </div>
+      <div class="co-side"><div class="co-card">
+        <div class="co-h">Bill summary</div>
+        <div class="bill"><span>Item total</span><span>Rs. ${sub}</span></div>
+        <div class="bill"><span>Delivery fee</span><span>${fee?`Rs. ${fee}`:"FREE"}</span></div>
+        <div class="bill tot"><span>To pay</span><span>Rs. ${sub+fee}</span></div>
+        <button class="place-final" id="placeFinal">Place order &middot; Rs. ${sub+fee}</button>
+        <p class="co-note">Delivery in 8 minutes to HSR Layout</p>
+      </div></div>
+    </div>`;
+  $("#coBack").onclick=()=>setView("setup");
+  $("#placeFinal").onclick=placeOrder;
 }
 
 /* ---- view switch ---- */
-function setView(v){$("#view-setup").classList.toggle("hidden",v!=="setup");$("#view-moment").classList.toggle("hidden",v!=="moment");$("#cartbar").classList.toggle("hidden",v!=="setup")}
+function setView(v){["setup","moment","checkout"].forEach(x=>$("#view-"+x).classList.toggle("hidden",x!==v));$("#cartbar").classList.toggle("hidden",v!=="setup")}
 $("#backBtn").onclick=()=>{state.order=null;state.oosId=null;state.offer=null;seedCart();refreshStore();setView("setup")};
 
 function placeOrder(){
@@ -364,7 +497,7 @@ function placeOrder(){
 function renderPhone(stage){
   const packing=stage!=="done";
   const items=state.order.map(o=>{const p=product(o.id),out=o.id===state.oosId&&stage!=="done";
-    return `<div class="oi ${out?"out":""}"><div class="th" style="background:${catColor(p.category)}">${initials(p.name)}</div><div class="grow"><div class="nm">${p.name}${o.qty>1?" x"+o.qty:""}</div><div class="pr">Rs. ${p.price}</div></div>${out?`<span class="flag">OUT</span>`:""}</div>`;}).join("");
+    return `<div class="oi ${out?"out":""}"><div class="th" style="background:${tint(p.category)}">${productIcon(p,'80%')}</div><div class="grow"><div class="nm">${p.name}${o.qty>1?" x"+o.qty:""}</div><div class="pr">Rs. ${p.price}</div></div>${out?`<span class="flag">OUT</span>`:""}</div>`;}).join("");
   let extra="";
   if(stage==="thinking")extra=`<hr class="divide"><div class="thinking"><div class="spin" style="width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></div>Finding a safe replacement for you...</div>`;
   else if(stage==="offer")extra=`<hr class="divide">`+offerHTML();
@@ -380,7 +513,7 @@ function offerHTMLrag(){
   const risk=b.unsafe?`<div class="risk"><b>Allergen risk.</b> This contains ${b.allergens.join(", ")}. QuickCart's similarity search has no model of this shopper's allergies, so it recommends it anyway.</div>`:`<div class="risk" style="background:var(--ground);border-color:var(--line);color:var(--soft)">Safe this time, but nothing was checked. Similarity is not safety.</div>`;
   return `<div class="offer rag"><div class="top"><b>Recommended replacement</b><span class="powered">QuickCart standard (RAG)</span></div>
     <p class="lead">${o.oos.name} is out of stock. Closest match by similarity:</p>
-    <div class="pick"><div class="th" style="background:${catColor(b.category)}">${initials(b.name)}</div><div class="grow"><div class="nm">${b.name}</div><div class="why">${b.reason}</div><span class="simchip">${b.similarity} cosine similarity</span></div></div>
+    <div class="pick"><div class="th" style="background:${tint(b.category)}">${productIcon(b,'80%')}</div><div class="grow"><div class="nm">${b.name}</div><div class="why">${b.reason}</div><span class="simchip">${b.similarity} cosine similarity</span></div></div>
     ${risk}<button class="fixbtn" id="fixBtn">Turn on SwapIQ to fix this &rarr;</button></div>`;
 }
 function offerHTMLswapiq(){
@@ -389,7 +522,7 @@ function offerHTMLswapiq(){
   const b=o.best,diff=b.price-o.oos.price,delta=diff<0?`Rs. ${-diff} less`:diff>0?`Rs. ${diff} more`:"same price";
   return `<div class="offer"><div class="top"><b>1 item is out of stock</b><span class="powered">Powered by SwapIQ</span></div>
     <p class="lead">${o.oos.name} just ran out. Here's a safe replacement:</p>
-    <div class="pick"><div class="th" style="background:${catColor(b.category)}">${initials(b.name)}</div><div class="grow"><div class="nm">${b.name}</div><div class="why">${b.reason}</div><span class="safe">Safe for you &middot; Rs. ${b.price} (${delta})</span></div></div>
+    <div class="pick"><div class="th" style="background:${tint(b.category)}">${productIcon(b,'80%')}</div><div class="grow"><div class="nm">${b.name}</div><div class="why">${b.reason}</div><span class="safe">Safe for you &middot; Rs. ${b.price} (${delta})</span></div></div>
     <div class="oactions"><button class="obtn oaccept" id="accBtn">Accept substitute</button><button class="obtn orefund" id="refBtn">Refund</button></div>
     ${o.alternatives.length?`<details class="alts"><summary>Other safe options (${o.alternatives.length})</summary>${o.alternatives.map(a=>`<div class="altline"><div class="grow"><div class="nm">${a.name} &middot; Rs. ${a.price}</div><div class="r">${a.reason}</div></div><button data-alt="${a.id}">Choose</button></div>`).join("")}</details>`:""}
     <details class="whyx"><summary>Why is this safe? See the proof</summary><div class="proof">${o.best.paths.join("\n")}</div></details></div>`;
