@@ -200,7 +200,7 @@ function sessionLog(){try{return JSON.parse(localStorage.getItem("swapiq")||"{}"
 function renderTiles(){
   const log=sessionLog(),acc=log.filter(d=>d.accepted).length,saved=log.reduce((s,d)=>s+(d.saved||0),0);
   $("#tiles").innerHTML=`
-    <div class="tile"><div class="k">Catalog</div><div class="v">${PLAT.products}</div><div class="n">${PLAT.categories} categories, ${PLAT.graph_nodes} graph nodes</div></div>
+    <div class="tile"><div class="k">Catalog</div><div class="v">${PLAT.products}</div><div class="n">${PLAT.categories} categories, ${PLAT.graph_nodes} graph nodes &middot; ${PLAT.graph_backend}${PLAT.graph_persistent?" persistent":" fallback"}</div></div>
     <div class="tile"><div class="k">Stockouts handled</div><div class="v">${log.length}</div><div class="n">this demo session</div></div>
     <div class="tile"><div class="k">Revenue recovered</div><div class="v">Rs. ${saved.toLocaleString("en-IN")}</div><div class="n">${log.length?Math.round(acc/log.length*100):0}% acceptance</div></div>
     <div class="tile"><div class="k">Listings flagged</div><div class="v">${PLAT.listings_with_issues}</div><div class="n">${PLAT.critical} critical</div></div>`;

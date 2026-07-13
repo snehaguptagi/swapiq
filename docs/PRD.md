@@ -1,6 +1,6 @@
 # SwapIQ: Product Requirements Document
 
-Version 2.0 - July 2026
+Version 2.1 - July 2026
 Retail and Consumer Goods / Commerce Infrastructure
 
 ## 1. Product vision
@@ -51,14 +51,16 @@ The initial buyer is a mid-market retailer or D2C brand that cannot justify buil
 - ListingIQ audit library for allergens, claims, required fields, dietary marks and listing completeness.
 - AI-assisted compliant listing rewrite.
 - Operator console with platform metrics, graph explorer, simulated store connection and recall propagation.
-- Neo4j loader and Cypher examples for the production database path.
+- Neo4j runtime backend for safety filtering, graph views, recall propagation, edge weights and metrics.
+- Explicit NetworkX fallback with automated parity tests against Neo4j.
+- Health endpoint that reports the active backend and persistence state.
 
 ### Not yet productionized
 
 - Live retailer catalog, inventory, payment or marketplace integrations.
 - Authentication, tenant isolation, persistent server-side learning and role-based access control.
 - Continuous marketplace policy synchronization.
-- Production Neo4j connection in the deployed API. The running demo uses NetworkX in memory.
+- Hosted Neo4j Aura credentials and production tenant data. The backend is implemented and locally validated; deployment still requires a managed database.
 - Human approval workflow, audit-log retention and regulatory certification.
 
 ## 6. Core user journeys
@@ -139,7 +141,7 @@ The expansion path is one graph powering several applications: substitution, saf
 | False confidence from synthetic data | Present data as synthetic and validate with a design partner's real catalog before commercial claims |
 | Marketplace policies change | Versioned policy packs with rule source and effective date |
 | Feature copied by a large retailer | Sell multi-tenant infrastructure to the long tail and compound the cross-workflow graph asset |
-| Neo4j presented as live when it is not | State clearly that the demo uses NetworkX and the repository contains the tested migration path |
+| Neo4j silently falls back in production | `SWAPIQ_GRAPH_BACKEND=neo4j` fails startup unless Neo4j is reachable; `/api/health` exposes the active backend |
 
 ## 11. Release acceptance criteria
 
@@ -149,4 +151,6 @@ The expansion path is one graph powering several applications: substitution, saf
 - Accepting the substitute updates the cart and allows order completion.
 - ListingIQ audits all 508 listings and exposes detailed findings.
 - Console metrics, recall endpoint and graph explorer render without browser errors.
+- Neo4j and NetworkX return identical safe/blocked sets and graph counts in the backend contract tests.
+- `/api/health` reports `neo4j`, `persistent: true` when the production backend is selected.
 - README, PRD, LLD and Neo4j setup accurately match the shipped implementation.

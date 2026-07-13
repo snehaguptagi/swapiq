@@ -1,6 +1,6 @@
 # SwapIQ: Low-Level Design
 
-Version 2.0 - July 2026
+Version 2.1 - July 2026
 
 ## 1. System overview
 
@@ -14,22 +14,25 @@ Customer browser
         v
 FastAPI API (api/index.py)
   +-- data_gen.py         deterministic 508-SKU catalog and four shoppers
-  +-- graph_core.py       NetworkX graph, safety traversal and learning
+  +-- graph_backend.py    Neo4j implementation + NetworkX backend contract
+  +-- graph_core.py       NetworkX fallback graph and pure learning function
   +-- agent.py            Claude ranking/explanation + deterministic fallback
   +-- listings.py         synthetic listing generator and compliance rules
         |
-        +-- Current demo: in-memory NetworkX DiGraph
-        +-- Production path: Neo4j via neo4j_loader.py
+        +-- Neo4j: persistent production graph and Cypher safety traversal
+        +-- NetworkX: explicit zero-infrastructure fallback
 ```
 
-The frontend is plain HTML, CSS and JavaScript with no build step or external runtime dependency. FastAPI is compatible with local Uvicorn and Vercel serverless routing. Learned substitution weights and the decision log are stored in browser `localStorage` and sent with relevant requests, keeping the demo API stateless.
+The frontend is plain HTML, CSS and JavaScript with no build step or external runtime dependency. FastAPI is compatible with local Uvicorn and Vercel serverless routing. Catalog facts and seeded swap edges are persistent in Neo4j when configured. Learned substitution weights and the decision log remain in browser `localStorage` for the demo and are sent with relevant requests.
 
 ## 2. Runtime and deployment
 
 - Local command: `uvicorn api.index:app --reload --port 8000`.
 - Vercel routes `/api/*` to `api/index.py` and serves `public/` statically.
 - The catalog is deterministic from a fixed seed and builds once per API process.
-- The live demo graph is a NetworkX `DiGraph`; no Neo4j connection is required.
+- `SWAPIQ_GRAPH_BACKEND=neo4j` requires a reachable Neo4j database and fails startup otherwise.
+- `SWAPIQ_GRAPH_BACKEND=auto` uses Neo4j when `NEO4J_URI` exists; `networkx` forces the fallback.
+- `NEO4J_AUTO_SYNC=true` idempotently upserts the complete demo graph, including `SWAP_OK` edges.
 - `ANTHROPIC_API_KEY` enables Claude. Without it, the deterministic ranker and listing fixer preserve the response shape.
 
 ## 3. Data model
@@ -84,7 +87,7 @@ The current dataset produces 624 nodes and 14,010 edges. Swap priors combine sam
 
 ## 5. Safety traversal
 
-`safe_candidates(G, oos_id, shopper, learned)` evaluates same-category candidates:
+`graph_backend.safe_candidates(oos_id, shopper, learned)` evaluates same-category candidates. In Neo4j mode a Cypher query traverses category, ingredient, allergen, diet-tag and `SWAP_OK` relationships before Python formats the cited result:
 
 1. Traverse candidate `CONTAINS -> IS_A` paths and intersect allergens with `shopper.avoids_allergens`.
 2. Require all shopper diet tags to exist in the candidate's derived tags.
@@ -130,7 +133,7 @@ The compliance pipeline separates decision logic from language generation:
 
 ## 9. Recall propagation
 
-`GET /api/recall?ingredient=almonds` normalizes the ingredient key and returns linked SKUs, categories, listing count, mapped allergen and shopper profiles at risk. The current endpoint traverses the in-memory catalog facts; the Neo4j production implementation uses the equivalent graph query and can extend to suppliers, batches and orders.
+`GET /api/recall?ingredient=almonds` normalizes the ingredient key and returns linked SKUs, categories, listing count, mapped allergen and shopper profiles at risk. Neo4j mode executes the ingredient-to-product/category/allergen traversal in Cypher. NetworkX mode implements the same backend contract from in-memory catalog facts.
 
 ## 10. API contract
 
@@ -147,6 +150,7 @@ The compliance pipeline separates decision logic from language generation:
 | POST | `/api/fix` | Corrected listing generated from cited findings |
 | GET | `/api/recall?ingredient=almonds` | Recall impact across linked catalog entities |
 | GET | `/api/platform` | Console metrics for catalog, graph and listing QA |
+| GET | `/api/health` | Readiness plus active graph backend and persistence state |
 
 ## 11. Frontend state and flows
 
@@ -162,23 +166,26 @@ The compliance pipeline separates decision logic from language generation:
 
 `public/console.html` combines `/api/platform`, `/api/bootstrap`, `/api/recall` and `/api/graph` into the integration animation, platform metrics, app catalog, recall report and canvas graph explorer.
 
-## 12. NetworkX and Neo4j status
+## 12. Neo4j backend and fallback
 
-| Current demo | Production path |
+| Neo4j mode | NetworkX fallback |
 |---|---|
-| NetworkX in API memory | Neo4j cluster or managed Aura instance |
-| 508 synthetic SKUs | Retailer catalog ETL with millions of SKUs |
-| Browser-local learned weights | Tenant/store/region-scoped persistent state |
-| Catalog facts rebuilt per process | Incremental product, supplier and batch updates |
-| Ingredient recall lookup | Cypher traversal across ingredient, supplier, batch, order and shopper nodes |
+| Persistent Product, Ingredient, Allergen, DietTag and Category nodes | Same schema represented in an in-memory `DiGraph` |
+| Persistent weighted `SWAP_OK` relationships | Seeded edges rebuilt per process |
+| Cypher safety, graph-view and recall queries | Equivalent Python traversals |
+| Aura or self-hosted Neo4j credentials required | No external infrastructure |
+| Required mode fails fast on connection or empty-database errors | Explicit mode for offline demos and tests |
 
-`neo4j_loader.py` loads the same product, ingredient, allergen, diet and category schema into Neo4j. `NEO4J_SETUP.md` contains the local setup and Cypher safety query. The deployed web API does not currently query Neo4j and must be described as Neo4j-ready rather than Neo4j-powered.
+`graph_backend.py` is the shared contract. `neo4j_loader.py` calls the same production backend to upsert all 508 products and 14,010 relationships. `tests/test_graph_backend.py` asserts identical safe/blocked sets and graph counts between Neo4j and NetworkX. Hosted deployments are Neo4j-powered only after Neo4j/Aura environment variables are configured; `/api/health` is the authoritative runtime signal.
 
 ## 13. Verification
 
 - Python modules compile with `python -m py_compile`.
 - `/api/bootstrap` returns 508 products, 24 categories and four shoppers.
 - `/api/platform` reports 624 nodes, 14,010 edges and all 508 listings audited.
+- `/api/health` reports `backend: neo4j`, `persistent: true` in the verified Neo4j run.
+- NetworkX contract tests pass without infrastructure; Neo4j parity tests pass against Neo4j 5.26.
+- The hero safety case returns 16 safe and 5 blocked candidates from both backends.
 - Desktop and 390-pixel mobile layouts render without horizontal page overflow.
 - Browser-tested flow: search -> cart -> RAG risk -> SwapIQ safe offer -> accept -> checkout -> order placed.
 - Browser console contains no errors or warnings during the verified journey.

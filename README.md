@@ -29,14 +29,14 @@ public/qa.html         ListingIQ catalog compliance QA
 api/index.py           FastAPI service (Vercel serverless compatible)
 api/data_gen.py        Synthetic catalog: 500+ SKUs; allergens and diet
                        tags derived from ingredient lists, never hand-set
-api/graph_core.py      NetworkX knowledge graph, safety traversal,
-                       pure learning function
+api/graph_backend.py   Neo4j runtime backend + NetworkX fallback contract
+api/graph_core.py      NetworkX fallback graph and pure learning function
 api/agent.py           Claude ranking (structured JSON output) with a
                        deterministic fallback when no API key is set
 api/listings.py        Listing generator and deterministic compliance rules
 ```
 
-The API is stateless: learned swap confidence and the decision log live in the browser (localStorage) and are passed per request, so the serverless deployment needs no database. In production the same schema moves to Neo4j and the learning state to the retailer's store.
+The catalog graph is persistent when Neo4j is configured. Learned swap confidence and the decision log remain in the browser for this demo and are passed per request; production moves that learning state to a tenant/store-scoped data store.
 
 ## Run locally
 
@@ -47,17 +47,43 @@ uvicorn api.index:app --reload --port 8000
 
 Open http://localhost:8000. Set `ANTHROPIC_API_KEY` to enable Claude ranking; without it a deterministic fallback keeps the demo fully functional.
 
+Without graph configuration the app uses the NetworkX fallback. To require the
+real Neo4j backend, start Neo4j, load the catalog and set:
+
+```powershell
+$env:SWAPIQ_GRAPH_BACKEND = "neo4j"
+$env:NEO4J_URI = "bolt://localhost:7687"
+$env:NEO4J_USER = "neo4j"
+$env:NEO4J_PASSWORD = "swapiq-demo"
+python neo4j_loader.py --demo
+uvicorn api.index:app --reload --port 8000
+```
+
+`GET /api/health` reports the active backend and persistence state.
+See `.env.example` for local and Neo4j Aura configuration.
+
+## Tests
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+With `NEO4J_URI`, `NEO4J_USER` and `NEO4J_PASSWORD` configured, the same command
+also runs Neo4j/NetworkX parity tests. Without Neo4j it runs the fallback
+contract and skips only the integration cases.
+
 ## Deploy
 
-Deployed on Vercel. `vercel.json` routes `/api/*` to the FastAPI serverless function; `public/` is served statically. Add `ANTHROPIC_API_KEY` as a Vercel environment variable to enable Claude.
+Deployed on Vercel. `vercel.json` routes `/api/*` to the FastAPI serverless function; `public/` is served statically. Add `ANTHROPIC_API_KEY` for Claude and the Neo4j variables above (normally using Neo4j Aura) to run the hosted API on Neo4j.
 
-## Neo4j (production graph)
+## Neo4j graph backend
 
-The running demo uses an in-memory NetworkX graph; it does not require or query
-Neo4j. The same schema loads into Neo4j for the production path: see
-[NEO4J_SETUP.md](NEO4J_SETUP.md) and `neo4j_loader.py`, which load the catalog
-and run the safety traversal as Cypher. Describe the current build as
-**Neo4j-ready**, not Neo4j-powered.
+Neo4j is implemented as a real runtime backend, not only a loader. Safety
+filtering, edge weights, graph visualization, recall propagation and platform
+metrics query Neo4j when configured. `SWAPIQ_GRAPH_BACKEND=neo4j` fails startup
+if the database is unavailable, preventing a silent fallback in production.
+`auto` uses Neo4j when `NEO4J_URI` is present, while `networkx` explicitly keeps
+the zero-infrastructure demo path. See [NEO4J_SETUP.md](NEO4J_SETUP.md).
 
 ## Documentation
 

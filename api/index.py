@@ -1,7 +1,7 @@
-"""SwapIQ API: stateless FastAPI service, deployable on Vercel serverless.
+"""SwapIQ API: FastAPI service with Neo4j production graph support.
 
-Session state (learned swap confidence, decision log) lives in the client and
-is passed per request, so no database is needed for the demo.
+Neo4j is used when configured; NetworkX is the explicit no-infrastructure
+fallback. Session learning remains client-side and travels with each request.
 
 Local dev:  uvicorn api.index:app --reload --port 8000
 """
@@ -14,18 +14,19 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from data_gen import INGREDIENT_ALLERGENS, generate_catalog, generate_shoppers
-from graph_core import (build_graph, edge_weight, explain_paths,
-                        safe_candidates, updated_weight)
+from graph_core import build_graph, updated_weight
+from graph_backend import create_graph_backend
 from agent import claude_available, get_api_key, rank_and_explain
 import listings as listing_qa
 
 app = FastAPI(title="SwapIQ API")
 
 catalog = generate_catalog()
-G = build_graph(catalog)
+NX_G = build_graph(catalog)
+graph_backend = create_graph_backend(NX_G, catalog)
 shoppers = generate_shoppers()
 products_by_id = {p["id"]: p for p in catalog}
 
@@ -83,19 +84,19 @@ def _is_unsafe(product, shopper):
 class OfferRequest(BaseModel):
     product_id: str
     shopper_id: str
-    learned: dict = {}
+    learned: dict = Field(default_factory=dict)
 
 
 class DecideRequest(BaseModel):
     oos_id: str
     chosen_id: str
     accepted: bool
-    learned: dict = {}
+    learned: dict = Field(default_factory=dict)
 
 
 class GraphRequest(BaseModel):
     focus: str
-    learned: dict = {}
+    learned: dict = Field(default_factory=dict)
 
 
 @app.get("/api/bootstrap")
@@ -104,6 +105,7 @@ def bootstrap():
              for sid, bases in DEMO_CARTS.items()}
     return {
         "claude": claude_available(),
+        "graph": graph_backend.health(),
         "shoppers": [
             {"id": s["id"], "name": s["name"],
              "avoids": [a.replace("_", " ") for a in s["avoids_allergens"]],
@@ -150,7 +152,7 @@ def safety_check(req: OfferRequest):
     oos = products_by_id[req.product_id]
     shopper = _shopper(req.shopper_id)
     t0 = time.perf_counter()
-    safe, blocked = safe_candidates(G, oos["id"], shopper, req.learned)
+    safe, blocked = graph_backend.safe_candidates(oos["id"], shopper, req.learned)
     graph_ms = round((time.perf_counter() - t0) * 1000, 1)
     naive = _naive_pick(oos)
     naive_out = {**_slim(naive), "unsafe": _is_unsafe(naive, shopper)} if naive else None
@@ -169,7 +171,7 @@ def swap_offer(req: OfferRequest):
     shopper = _shopper(req.shopper_id)
 
     t0 = time.perf_counter()
-    safe, blocked = safe_candidates(G, oos["id"], shopper, req.learned)
+    safe, blocked = graph_backend.safe_candidates(oos["id"], shopper, req.learned)
     graph_ms = round((time.perf_counter() - t0) * 1000, 1)
 
     naive = _naive_pick(oos)
@@ -193,7 +195,7 @@ def swap_offer(req: OfferRequest):
         cand = safe_by_id[r["product_id"]]
         return {**_slim(products_by_id[cand["id"]]), "reason": r["reason"],
                 "weight": cand["weight"],
-                "paths": explain_paths(G, oos["id"], cand, shopper)}
+                "paths": graph_backend.explain_paths(oos["id"], cand, shopper)}
 
     best = next(r for r in ranking["ranking"] if r["product_id"] == ranking["best_id"])
     return {**base, "source": ranking["source"], "rank_s": rank_s, "best": entry(best),
@@ -204,44 +206,15 @@ def swap_offer(req: OfferRequest):
 @app.post("/api/decide")
 def decide(req: DecideRequest):
     """Pure learning step. The client stores the returned weight and passes it back."""
-    old_w, _ = edge_weight(G, req.oos_id, req.chosen_id, req.learned)
+    old_w, _ = graph_backend.edge_weight(req.oos_id, req.chosen_id, req.learned)
     new_w = updated_weight(old_w, req.accepted)
     return {"edge": f"{req.oos_id}|{req.chosen_id}", "weight_before": old_w, "weight_after": new_w}
 
 
 @app.post("/api/graph")
 def graph_view(req: GraphRequest):
-    """Subgraph around a product for the frontend canvas renderer."""
-    focus = req.focus
-    nodes, edges, seen = [], [], set()
-
-    def add_node(nid, ntype, label):
-        if nid not in seen:
-            seen.add(nid)
-            nodes.append({"id": nid, "type": ntype, "label": label})
-
-    add_node(focus, "product", G.nodes[focus]["name"])
-    for _, v, d in G.out_edges(focus, data=True):
-        et = d.get("edge_type")
-        if et in ("CONTAINS", "IN_CATEGORY", "HAS_TAG"):
-            data = G.nodes[v]
-            add_node(v, data["node_type"], data.get("label", v))
-            edges.append({"from": focus, "to": v, "label": et})
-            if et == "CONTAINS":
-                for _, v2, d2 in G.out_edges(v, data=True):
-                    if d2.get("edge_type") == "IS_A":
-                        add_node(v2, "allergen", G.nodes[v2]["label"])
-                        edges.append({"from": v, "to": v2, "label": "IS_A"})
-
-    swaps = []
-    for _, v, d in G.out_edges(focus, data=True):
-        if d.get("edge_type") == "SWAP_OK":
-            w, _n = edge_weight(G, focus, v, req.learned)
-            swaps.append((v, w))
-    for v, w in sorted(swaps, key=lambda x: x[1], reverse=True)[:4]:
-        add_node(v, "product", G.nodes[v]["name"])
-        edges.append({"from": focus, "to": v, "label": f"SWAP {w:.2f}"})
-    return {"nodes": nodes, "edges": edges, "focus": focus}
+    """Subgraph around a product, queried from the active graph backend."""
+    return graph_backend.graph_view(req.focus, req.learned)
 
 
 # ---------------- ListingIQ: compliance QA ----------------
@@ -344,9 +317,10 @@ def recall(ingredient: str):
     shopper linked to a recalled ingredient. The graph does in milliseconds what
     a manual catalog sweep takes days to do."""
     key = ingredient.replace(" ", "_")
-    aff = [p for p in catalog if key in p["ingredients"]]
-    allergen = INGREDIENT_ALLERGENS.get(key)
-    cats = sorted({p["category"].replace("_", " ") for p in aff})
+    impact = graph_backend.recall(key)
+    aff = impact["products"]
+    allergen = impact["allergen"] or INGREDIENT_ALLERGENS.get(key)
+    cats = [category.replace("_", " ") for category in impact["categories"]]
     at_risk = [s["name"] for s in shoppers if allergen and allergen in s["avoids_allergens"]]
     return {"ingredient": ingredient.replace("_", " "),
             "allergen": (allergen or "none").replace("_", " "),
@@ -359,10 +333,19 @@ def recall(ingredient: str):
 def platform():
     """Platform-level snapshot for the operator console."""
     qa = qa_summary()
+    graph_stats = graph_backend.stats()
     return {"products": len(catalog), "categories": len({p["category"] for p in catalog}),
-            "graph_nodes": G.number_of_nodes(), "graph_edges": G.number_of_edges(),
+            "graph_backend": graph_backend.name, "graph_persistent": graph_backend.persistent,
+            "graph_nodes": graph_stats["nodes"], "graph_edges": graph_stats["edges"],
             "listings_audited": qa["total"], "listings_with_issues": qa["with_issues"],
             "critical": qa["critical"], "shoppers": len(shoppers)}
+
+
+@app.get("/api/health")
+def health():
+    """Readiness signal, including the active graph implementation."""
+    return {"status": "ok", "graph": graph_backend.health(),
+            "products": len(catalog), "claude": claude_available()}
 
 
 # Local development only: serve the frontend. On Vercel, static files are
