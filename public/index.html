@@ -147,6 +147,7 @@
   .place-final{width:100%;border:none;background:var(--qc);color:#fff;border-radius:11px;padding:13px;font-size:15px;font-weight:700;margin-top:12px}
   .place-final:hover{background:var(--qc-dark)}
   .co-note{font-size:11.5px;color:var(--faint);text-align:center;margin-top:8px}
+  .co-done{text-align:center;padding:70px 20px}.co-done .big{font-size:46px;color:var(--qc)}.co-done h2{font-size:21px;margin:8px 0 4px}.co-done p{color:var(--soft);font-size:13.5px}
   /* micro-interactions */
   @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
   .cart-pill .count.bump{animation:pop .32s ease}
@@ -267,7 +268,7 @@
 
   <!-- MOMENT (split) -->
   <div id="view-moment" class="hidden">
-    <div class="moment-head"><div><div class="t">Order placed</div><div class="tag" id="orderTag"></div></div><button class="backbtn" id="backBtn">&larr; Back to store</button></div>
+    <div class="moment-head"><div><div class="t">Reviewing your cart</div><div class="tag" id="orderTag"></div></div><button class="backbtn" id="backBtn">&larr; Back to store</button></div>
     <div class="moment">
       <div class="cust-col">
         <div class="side-h"><span class="pill qc">QuickCart</span> what the customer sees</div>
@@ -338,24 +339,24 @@ function profileText(s){const b=[];if(s.avoids.length)b.push("avoids "+s.avoids.
 const isUnsafe=p=>{const s=shopper();return p.allergens.some(a=>s.avoids.includes(a))};
 function hexToRgba(h,a){const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`}
 const tint=c=>hexToRgba(catColor(c),0.13);
-const SHAPES={
-  carton:'<path d="M13 17 L20 11 L27 17 L27 31 L13 31 Z"/><path d="M13 17 H27"/>',
-  bottle:'<path d="M17 9 h6 v3 l2 4 v15 h-10 v-15 l2 -4 z"/><path d="M17 16 h6"/>',
-  jar:'<rect x="12" y="15" width="16" height="17" rx="2"/><path d="M14 15 v-3 h12 v3"/>',
-  box:'<rect x="11" y="12" width="18" height="20" rx="2"/><path d="M11 19 H29"/>',
-  loaf:'<path d="M10 25 q0 -11 10 -11 q10 0 10 11 v6 h-20 z"/>',
-  cup:'<path d="M14 15 h12 l-1.5 17 h-9 z"/><path d="M13 15 h14"/>',
-  packet:'<path d="M13 13 h14 v19 h-14 z"/><path d="M13 13 l3 -3 h8 l3 3"/>',
-  bag:'<path d="M14 15 q6 -4 12 0 v13 q-6 3 -12 0 z"/><path d="M14 15 l-1 -4 h14 l-1 4"/>',
-  apple:'<circle cx="20" cy="23" r="8.5"/><path d="M20 14.5 v-3.5 q3 -1 4 1"/>',
-  egg:'<ellipse cx="20" cy="22" rx="7.5" ry="10"/>',
-  bar:'<rect x="12" y="15" width="16" height="13" rx="2"/><path d="M20 15 v13 M12 21.5 h16"/>'
+const GFX={
+  carton:c=>`<path d="M15 19 L24 11 L33 19 V40 H15 Z" fill="#fff" stroke="#dcdce4" stroke-width="1.1"/><path d="M15 19 L24 11 L33 19 Z" fill="${c}"/><rect x="15" y="27" width="18" height="8" fill="${c}"/><rect x="21.5" y="9.5" width="5" height="3" rx="1" fill="#c9c9d4"/>`,
+  bottle:c=>`<path d="M20 13 h8 v3 l2 4 v18 a2 2 0 0 1 -2 2 h-8 a2 2 0 0 1 -2 -2 v-18 l2 -4 z" fill="#fff" stroke="#dcdce4" stroke-width="1.1"/><rect x="18" y="27" width="12" height="9" fill="${c}"/><rect x="21" y="10" width="6" height="4" rx="1" fill="#c9c9d4"/>`,
+  jar:c=>`<rect x="16" y="17" width="16" height="23" rx="3" fill="#fff" stroke="#dcdce4" stroke-width="1.1"/><rect x="15" y="12" width="18" height="6" rx="2" fill="${c}"/><rect x="18.5" y="24" width="11" height="10" rx="1" fill="${c}" opacity="0.28"/>`,
+  box:c=>`<rect x="14" y="14" width="20" height="25" rx="2" fill="${c}"/><rect x="17" y="19" width="14" height="12" rx="1" fill="#fff" opacity="0.92"/><rect x="19" y="22" width="10" height="2.4" rx="1" fill="${c}" opacity="0.55"/>`,
+  loaf:c=>`<path d="M13 27 q0 -13 11 -13 t11 13 v8 q0 2 -2 2 H15 q-2 0 -2 -2 z" fill="${c}"/><path d="M18 20 v14 M24 18 v16 M30 20 v14" stroke="#fff" stroke-width="1.1" opacity="0.4"/>`,
+  cup:c=>`<path d="M17 17 h14 l-2 21 q-0.2 2 -2 2 h-6 q-1.8 0 -2 -2 z" fill="#fff" stroke="#dcdce4" stroke-width="1.1"/><rect x="15" y="13" width="18" height="5" rx="2" fill="${c}"/><rect x="18.5" y="23" width="11" height="9" fill="${c}" opacity="0.28"/>`,
+  pouch:c=>`<path d="M15 17 h18 v23 h-18 z" fill="${c}"/><path d="M15 17 l2 -4 h14 l2 4 z" fill="${c}" opacity="0.55"/><rect x="18" y="25" width="12" height="8" rx="1" fill="#fff" opacity="0.9"/>`,
+  bag:c=>`<path d="M16 19 q8 -5 16 0 v17 q-8 4 -16 0 z" fill="${c}"/><path d="M16 19 l-1.5 -6 h19 l-1.5 6 z" fill="${c}" opacity="0.65"/><rect x="20" y="26" width="8" height="7" rx="1" fill="#fff" opacity="0.85"/>`,
+  apple:c=>`<path d="M24 18 q-9 -3 -9 9 q0 11 9 13 q9 -2 9 -13 q0 -12 -9 -9 z" fill="${c}"/><rect x="23" y="12" width="2" height="7" rx="1" fill="#8a6a4a"/><path d="M25 15 q4 -4 7 -2 q-2 4 -7 2 z" fill="#5A9E6F"/>`,
+  egg:c=>`<ellipse cx="20" cy="27" rx="7" ry="9.5" fill="#fff" stroke="#e6dcc4" stroke-width="1.1"/><ellipse cx="29" cy="24" rx="7" ry="9.5" fill="#f4ecd6" stroke="#e6dcc4" stroke-width="1.1"/>`,
+  bar:c=>`<path d="M14 18 l3 -4 h14 l3 4 v2 h-20 z" fill="${c}" opacity="0.6"/><rect x="14" y="20" width="20" height="15" rx="1.5" fill="${c}"/><path d="M21 20 v15 M28 20 v15 M14 27.5 h20" stroke="#fff" stroke-width="1.1" opacity="0.45"/>`
 };
 const CAT_SHAPE={plant_milk:'carton',dairy_milk:'carton',yogurt:'cup',dairy_alternatives:'box',cheese:'box',
-  bread:'loaf',pasta:'box',noodles:'packet',spreads:'jar',snacks:'packet',biscuits:'packet',chocolate:'bar',
+  bread:'loaf',pasta:'box',noodles:'pouch',spreads:'jar',snacks:'pouch',biscuits:'pouch',chocolate:'bar',
   staples:'bag',pulses_dal:'bag',tea_coffee:'cup',breakfast:'box',sauces:'bottle',frozen:'box',dry_fruits:'bag',
   fruits_veg:'apple',eggs:'egg',beverages:'bottle',health:'jar',baby:'bottle'};
-function productIcon(p,size){size=size||'70%';return `<svg viewBox="0 0 40 40" width="${size}" height="${size}" fill="none" stroke="${catColor(p.category)}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round">${SHAPES[CAT_SHAPE[p.category]||'box']}</svg>`}
+function productIcon(p,size){size=size||'84%';const c=catColor(p.category);return `<svg viewBox="0 0 48 48" width="${size}" height="${size}">${(GFX[CAT_SHAPE[p.category]]||GFX.box)(c)}</svg>`}
 function cartCount(){return Object.values(state.cart).reduce((a,b)=>a+b,0)}
 function cartTotal(){return Object.entries(state.cart).reduce((a,[id,q])=>a+product(id).price*q,0)}
 
@@ -447,7 +448,7 @@ function renderCartDrawer(){
     <div class="drawer-foot"><div class="drow-tot"><span>Total</span><span>Rs. ${cartTotal()}</span></div>
       <button class="drawer-cta" id="toCheckout" ${ids.length?"":"disabled"}>Proceed to checkout</button></div>`;
   $("#closeCart").onclick=closeCart;
-  const tc=$("#toCheckout");if(tc)tc.onclick=()=>{closeCart();renderCheckout();setView("checkout")};
+  const tc=$("#toCheckout");if(tc)tc.onclick=()=>{closeCart();resolveCart()};
   $$("#drawer [data-inc]").forEach(b=>b.onclick=()=>{state.cart[b.dataset.inc]++;renderCartDrawer();renderCartBar();renderCartCount()});
   $$("#drawer [data-dec]").forEach(b=>b.onclick=()=>{const id=b.dataset.dec;state.cart[id]--;if(state.cart[id]<=0)delete state.cart[id];renderCartDrawer();renderCartBar();renderCartCount();renderHome()});
 }
@@ -478,34 +479,42 @@ function renderCheckout(){
       </div></div>
     </div>`;
   $("#coBack").onclick=()=>setView("setup");
-  $("#placeFinal").onclick=placeOrder;
+  $("#placeFinal").onclick=finalizeOrder;
 }
 
 /* ---- view switch ---- */
 function setView(v){["setup","moment","checkout"].forEach(x=>$("#view-"+x).classList.toggle("hidden",x!==v));$("#cartbar").classList.toggle("hidden",v!=="setup")}
 $("#backBtn").onclick=()=>{state.order=null;state.oosId=null;state.offer=null;seedCart();refreshStore();setView("setup")};
 
-function placeOrder(){
+function resolveCart(){
   state.order=Object.keys(state.cart).map(id=>({id,qty:state.cart[id]}));
-  $("#orderTag").textContent="QC-"+(1000+state.log.length*7)+" · packing at the store";
+  $("#orderTag").textContent="checking stock at the store";
   setView("moment");
   const oos=state.order.find(o=>product(o.id).category==="plant milk")||state.order[0];
   runMoment(oos.id);
 }
+function finalizeOrder(){
+  const paid=cartTotal()+(cartTotal()>199?0:25);
+  $("#view-checkout").innerHTML=`<div class="co-done"><div class="big">&#10003;</div><h2>Order placed</h2><p>Arriving in 8 minutes to HSR Layout. Rs. ${paid} paid via UPI.</p><button class="drawer-cta" id="coHome" style="max-width:260px;margin:16px auto 0">Back to store</button></div>`;
+  $("#coHome").onclick=()=>{state.order=null;state.oosId=null;state.offer=null;seedCart();refreshStore();setView("setup")};
+}
 
 /* ---- phone ---- */
 function renderPhone(stage){
-  const packing=stage!=="done";
-  const items=state.order.map(o=>{const p=product(o.id),out=o.id===state.oosId&&stage!=="done";
+  const resolved=stage==="resolved";
+  const src=resolved?Object.keys(state.cart).map(id=>({id,qty:state.cart[id]})):state.order;
+  const items=src.map(o=>{const p=product(o.id),out=o.id===state.oosId&&!resolved;
     return `<div class="oi ${out?"out":""}"><div class="th" style="background:${tint(p.category)}">${productIcon(p,'80%')}</div><div class="grow"><div class="nm">${p.name}${o.qty>1?" x"+o.qty:""}</div><div class="pr">Rs. ${p.price}</div></div>${out?`<span class="flag">OUT</span>`:""}</div>`;}).join("");
   let extra="";
   if(stage==="thinking")extra=`<hr class="divide"><div class="thinking"><div class="spin" style="width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></div>Finding a safe replacement for you...</div>`;
   else if(stage==="offer")extra=`<hr class="divide">`+offerHTML();
-  else if(stage==="done")extra=`<hr class="divide">`+doneHTML();
-  $("#phoneEta").textContent=stage==="offer"?"1 item needs your attention":stage==="done"?"Order confirmed":"Packing at the store...";
-  $("#phoneBody").innerHTML=`<div class="trk"><div class="row done"><span class="dot"></span>Order placed</div><div class="row ${packing?"active":"done"}"><span class="dot"></span>Packing at the store${packing?"...":""}</div><div class="row ${stage==="done"?"active":""}"><span class="dot"></span>Out for delivery</div></div><hr class="divide">${items}${extra}`;
+  else if(resolved)extra=`<hr class="divide">`+resolvedHTML();
+  $("#phoneEta").textContent=stage==="offer"?"1 item is out of stock":resolved?"Cart updated":"Checking stock at the store...";
+  $("#phoneBody").innerHTML=`<div class="trk"><div class="row done"><span class="dot"></span>Items in your cart</div><div class="row ${resolved?"done":"active"}"><span class="dot"></span>Checking stock at the store${resolved?"":"..."}</div><div class="row ${resolved?"active":""}"><span class="dot"></span>Ready to check out</div></div><hr class="divide">${items}${extra}`;
   bindOffer();
 }
+function resolvedHTML(){const k=state.lastKind;
+  return `<div class="offer confirm"><div class="big">${k==="accept"?"&#10003;":"&#8617;"}</div><h3>${k==="accept"?"Substitute added to your cart":"Item removed"}</h3><p>${k==="accept"?state.lastChosen.name+" replaces the out-of-stock item.":"Rs. "+state.lastAmt+" will not be charged."}</p><button class="drawer-cta" id="continueCo" style="max-width:280px;margin:14px auto 0">Continue to checkout &rarr;</button></div>`;}
 function offerHTML(){return state.offer.mode==="rag"?offerHTMLrag():offerHTMLswapiq();}
 function offerHTMLrag(){
   const o=state.offer,b=o.best;
@@ -532,8 +541,9 @@ function bindOffer(){
   const acc=$("#accBtn"),ref=$("#refBtn"),ok=$("#okBtn"),fix=$("#fixBtn");
   if(acc)acc.onclick=()=>decide(state.offer.best,true);
   if(ref)ref.onclick=()=>decide(state.offer.best,false);
-  if(ok)ok.onclick=()=>{state.lastKind="refund";state.lastAmt=state.offer.oos.price;renderPhone("done")};
+  if(ok)ok.onclick=()=>{state.lastKind="refund";state.lastAmt=state.offer.oos.price;delete state.cart[state.offer.oos.id];renderCartCount();renderCartBar();renderPhone("resolved")};
   if(fix)fix.onclick=()=>{state.mode="swapiq";renderToggle();runMoment(state.oosId)};
+  const cont=$("#continueCo");if(cont)cont.onclick=()=>{if(!cartCount()){seedCart();refreshStore();setView("setup");toast("Cart was empty, restored demo cart.");return}renderCheckout();setView("checkout")};
   $$("#phoneBody [data-alt]").forEach(bt=>{const a=state.offer.alternatives.find(x=>x.id===bt.dataset.alt);bt.onclick=()=>decide(a,true)});
 }
 
@@ -585,9 +595,12 @@ async function decide(chosen,accepted){
   state.log.push({time:new Date().toISOString().slice(0,19).replace("T"," "),shopper:shopper().name.split(" (")[0],oos:o.oos.name,offered:chosen.name,accepted,saved:accepted?chosen.price:0,lost:accepted?0:o.oos.price,w0:j.weight_before,w1:j.weight_after});
   persist();
   state.lastKind=accepted?"accept":"refund";state.lastChosen=chosen;state.lastAmt=accepted?chosen.price:o.oos.price;
-  setStep(3,"done",accepted?"accepted - substitute added":"refund taken",`swap confidence ${j.weight_before.toFixed(2)} -> ${j.weight_after.toFixed(2)}`);
-  renderPhone("done");showImpact();
-  toast(accepted?`Accepted. Rs. ${chosen.price} retained. The graph learned this swap.`:`Refunded. Confidence lowered. Future offers improve.`);
+  delete state.cart[o.oos.id];
+  if(accepted)state.cart[chosen.id]=(state.cart[chosen.id]||0)+1;
+  renderCartCount();renderCartBar();
+  setStep(3,"done",accepted?"accepted - substitute added to cart":"removed from cart",`swap confidence ${j.weight_before.toFixed(2)} -> ${j.weight_after.toFixed(2)}`);
+  renderPhone("resolved");showImpact();
+  toast(accepted?`Substitute added to your cart. The graph learned this swap.`:`Item removed. Confidence lowered; future offers improve.`);
 }
 function showImpact(){
   const n=state.log.length,acc=state.log.filter(d=>d.accepted).length,saved=state.log.reduce((s,d)=>s+d.saved,0);
