@@ -51,11 +51,22 @@
   main{max-width:1140px;margin:0 auto;padding:16px 22px 90px}
 
   /* ---- storefront ---- */
-  .storehero{background:linear-gradient(100deg,#fdf0c0,#fbe79b);border:1px solid #f2df9a;border-radius:14px;padding:14px 20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
-  .storehero h1{font-size:17px;letter-spacing:-.01em}
-  .storehero p{font-size:12.5px;color:#7a6a2e}
-  .storehero .badge{background:#fff;border:1px solid #f0e4a8;border-radius:10px;padding:8px 13px;font-size:11px;font-weight:600;color:var(--soft);white-space:nowrap}
-  .storehero .badge b{font-size:13.5px;display:block;color:var(--accent-dark)}
+  .banner{background:linear-gradient(100deg,#fdf0c0,#fbe79b);border:1px solid #f2df9a;border-radius:14px;padding:16px 22px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+  .banner h1{font-size:19px;letter-spacing:-.01em}
+  .banner p{font-size:12.5px;color:#7a6a2e}
+  .banner-badge{background:#fff;border:1px solid #f0e4a8;border-radius:10px;padding:8px 13px;font-size:11.5px;font-weight:700;color:var(--accent-dark);white-space:nowrap}
+  .circles{display:flex;gap:14px;overflow-x:auto;padding:4px 0 14px;margin-bottom:8px}
+  .circ{border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:64px;font-size:11px;font-weight:600;color:var(--soft)}
+  .circ-th{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px}
+  .circ:hover{color:var(--ink)}
+  .rail-sec{margin-bottom:22px}
+  .rail-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+  .rail-head b{font-size:16px;letter-spacing:-.01em}
+  .seeall{border:none;background:none;color:var(--accent-dark);font-size:12px;font-weight:700}
+  .rail{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px}
+  .rail .pcard{min-width:162px;width:162px}
+  .sec-title{font-size:17px;font-weight:700;margin:6px 0 12px}
+  .backhome{border:none;background:none;color:var(--soft);font-size:13px;font-weight:600;padding:0 0 8px}
   .store{display:grid;grid-template-columns:132px 1fr;gap:16px;align-items:start}
   @media(max-width:720px){.store{grid-template-columns:1fr}.subrail{display:flex;overflow-x:auto;gap:8px}.subrail .sub{flex-direction:column;min-width:70px}}
   .subrail{position:sticky;top:132px;display:flex;flex-direction:column;gap:4px}
@@ -197,16 +208,7 @@
 
 <main>
   <!-- SETUP / STOREFRONT -->
-  <div id="view-setup">
-    <div class="storehero">
-      <div><h1>Groceries delivered in 8 minutes</h1><p>A demo storefront running SwapIQ. Add items, place the order, and see what happens when the store runs out.</p></div>
-      <div class="badge">Substitution engine<b>Powered by SwapIQ</b></div>
-    </div>
-    <div class="store">
-      <aside class="subrail" id="subrail"></aside>
-      <div class="pgrid" id="pgrid"></div>
-    </div>
-  </div>
+  <div id="view-setup"><div id="home"></div></div>
 
   <!-- MOMENT (split) -->
   <div id="view-moment" class="hidden">
@@ -279,10 +281,10 @@ function cartTotal(){return Object.entries(state.cart).reduce((a,[id,q])=>a+prod
 
 async function boot(){
   state.data=await(await fetch("/api/bootstrap")).json();
-  seedCart();renderAcct();renderToggle();renderRail();renderGrid();renderCartBar();renderCartCount();renderGraphSelect();
+  seedCart();renderAcct();renderToggle();renderHome();renderCartBar();renderCartCount();renderGraphSelect();
 }
 function seedCart(){state.cart={};(state.data.demo_carts[state.shopperId]||[]).forEach(id=>state.cart[id]=1)}
-function refreshStore(){renderRail();renderGrid();renderCartBar();renderCartCount()}
+function refreshStore(){renderHome();renderCartBar();renderCartCount()}
 
 /* ---- account ---- */
 function renderAcct(){const s=shopper();$("#acctAv").textContent=s.name[0];$("#acctName").textContent=s.name.split(" (")[0];$("#acctPf").textContent=profileText(s)}
@@ -298,17 +300,25 @@ $("#swiqToggle").onclick=()=>{state.mode=state.mode==="swapiq"?"rag":"swapiq";re
 
 /* ---- storefront ---- */
 function catList(){return [...new Set(state.data.products.map(p=>p.category))]}
-function renderRail(){
-  $("#subrail").innerHTML=`<button class="sub ${state.cat==='all'?'on':''}" data-c="all"><span class="subth" style="background:var(--ink)">All</span><span>All items</span></button>`+
-    catList().map(c=>`<button class="sub ${state.cat===c?'on':''}" data-c="${c}"><span class="subth" style="background:${catColor(c)}">${catLabel(c).slice(0,2)}</span><span>${catLabel(c)}</span></button>`).join("");
-  $$("#subrail .sub").forEach(b=>b.onclick=()=>{state.cat=b.dataset.c;renderRail();renderGrid()});
-}
-function renderGrid(){
-  let items=state.data.products;
-  if(state.cat!=="all")items=items.filter(p=>p.category===state.cat);
-  if(state.q)items=items.filter(p=>p.name.toLowerCase().includes(state.q.toLowerCase()));
-  const cap=state.cat==="all"&&!state.q?15:60;
-  $("#pgrid").innerHTML=items.slice(0,cap).map(cardHTML).join("")||`<p class="empty">No products match.</p>`;
+function catProducts(c){return state.data.products.filter(p=>p.category===c)}
+function renderHome(){
+  const home=$("#home");
+  if(state.q){
+    const items=state.data.products.filter(p=>p.name.toLowerCase().includes(state.q.toLowerCase()));
+    home.innerHTML=`<div class="sec-title">Results for "${state.q}"</div><div class="pgrid">${items.slice(0,48).map(cardHTML).join("")||'<p class="empty">No products match.</p>'}</div>`;
+    return bindGrid();
+  }
+  if(state.cat!=="all"){
+    home.innerHTML=`<button class="backhome" id="backHome">&larr; All categories</button><div class="sec-title">${catLabel(state.cat)} (${catProducts(state.cat).length})</div><div class="pgrid">${catProducts(state.cat).map(cardHTML).join("")}</div>`;
+    $("#backHome").onclick=()=>{state.cat="all";renderHome();window.scrollTo({top:0,behavior:"smooth"})};
+    return bindGrid();
+  }
+  const cats=catList();
+  const circles=cats.map(c=>`<button class="circ" data-c="${c}"><span class="circ-th" style="background:${catColor(c)}">${catLabel(c).slice(0,2)}</span><span>${catLabel(c)}</span></button>`).join("");
+  const rails=cats.map(c=>`<div class="rail-sec"><div class="rail-head"><b>${catLabel(c)}</b><button class="seeall" data-c="${c}">see all &rarr;</button></div><div class="rail">${catProducts(c).slice(0,12).map(cardHTML).join("")}</div></div>`).join("");
+  home.innerHTML=`<div class="banner"><div><h1>Groceries in 8 minutes</h1><p>Free delivery on your first 3 orders</p></div><span class="banner-badge">Powered by SwapIQ</span></div>
+    <div class="circles">${circles}</div>${rails}`;
+  $$("#home .circ,#home .seeall").forEach(b=>b.onclick=()=>{state.cat=b.dataset.c;renderHome();window.scrollTo({top:0,behavior:"smooth"})});
   bindGrid();
 }
 function cardHTML(p){
@@ -323,11 +333,11 @@ function cardHTML(p){
       ${q?`<div class="padd on"><button data-dec="${p.id}">-</button>${q}<button data-inc="${p.id}">+</button></div>`:`<button class="padd" data-add="${p.id}">ADD</button>`}</div></div>`;
 }
 function bindGrid(){
-  $$("#pgrid [data-add]").forEach(b=>b.onclick=()=>{state.cart[b.dataset.add]=1;renderGrid();renderCartBar();renderCartCount()});
-  $$("#pgrid [data-inc]").forEach(b=>b.onclick=()=>{state.cart[b.dataset.inc]++;renderGrid();renderCartBar();renderCartCount()});
-  $$("#pgrid [data-dec]").forEach(b=>b.onclick=()=>{const id=b.dataset.dec;state.cart[id]--;if(state.cart[id]<=0)delete state.cart[id];renderGrid();renderCartBar();renderCartCount()});
+  $$("#home [data-add]").forEach(b=>b.onclick=()=>{state.cart[b.dataset.add]=1;renderHome();renderCartBar();renderCartCount()});
+  $$("#home [data-inc]").forEach(b=>b.onclick=()=>{state.cart[b.dataset.inc]++;renderHome();renderCartBar();renderCartCount()});
+  $$("#home [data-dec]").forEach(b=>b.onclick=()=>{const id=b.dataset.dec;state.cart[id]--;if(state.cart[id]<=0)delete state.cart[id];renderHome();renderCartBar();renderCartCount()});
 }
-$("#search").addEventListener("input",e=>{state.q=e.target.value;renderGrid()});
+$("#search").addEventListener("input",e=>{state.q=e.target.value;renderHome()});
 $("#cartPill").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
 function renderCartCount(){$("#cartCount").textContent=cartCount()}
 function renderCartBar(){
