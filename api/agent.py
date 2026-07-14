@@ -81,7 +81,8 @@ def _rank_with_claude(oos_product, candidates, shopper, top_n):
         return None
 
     context = {
-        "out_of_stock": {"name": oos_product["name"], "price": oos_product["price"]},
+        "out_of_stock": {"name": oos_product["name"], "price": oos_product["price"],
+                         "typical_use": oos_product.get("use_cases", [])},
         "shopper": {
             "avoids_allergens": shopper["avoids_allergens"],
             "diet": shopper["diet"],
@@ -89,18 +90,29 @@ def _rank_with_claude(oos_product, candidates, shopper, top_n):
         },
         "candidates": [
             {"product_id": c["id"], "name": c["name"], "price": c["price"],
-             "diet_tags": c["diet_tags"], "past_acceptance_weight": c["weight"]}
+             "diet_tags": c["diet_tags"], "past_acceptance_weight": c["weight"],
+             "matches_typical_use": c.get("use_case_match", []),
+             "nutrition_note": c.get("nutrition_note"),
+             "certifications": c.get("certifications", []),
+             "matches_shopper_preferred_brand": c.get("brand_match", False),
+             "confirmed_in_stock_at_this_store": c.get("stock_level") == "high"}
             for c in candidates
         ],
     }
     prompt = (
         "You are a grocery substitution assistant. An ordered item is out of stock. "
         "Every candidate below has ALREADY passed a knowledge-graph safety check for this "
-        "shopper's allergies and diet, so all are safe. Your job is judgment and language: "
-        f"rank the top {top_n} candidates by how well they replace the out-of-stock item "
-        "(same use, price closeness, past acceptance weight), and write ONE short, honest, "
-        "customer-facing reason for each. Mention the acceptance rate as a percentage when "
-        "the weight is above 0.5.\n\n"
+        "shopper's allergies and diet, so all are safe, and has already been confirmed in "
+        "stock at the fulfilling store. Your job is judgment and language: "
+        f"rank the top {top_n} candidates by how well they replace the out-of-stock item. "
+        "Weigh, in order: matching the out-of-stock item's typical use (a coffee-only milk "
+        "should not outrank a versatile one when the shopper's usual item was versatile), "
+        "price closeness, past acceptance weight, then nutrition, certifications and brand "
+        "match as tie-breakers. Write ONE short, honest, customer-facing reason for each, "
+        "citing the concrete factor that made it a good fit (same use, comparable nutrition, "
+        "a certification, or a brand this shopper buys) rather than generic praise. Mention "
+        "the acceptance rate as a percentage when the weight is above 0.5. Never mention "
+        "margin, cost, or clearance stock; those are not the shopper's concern.\n\n"
         f"Context:\n{json.dumps(context, indent=1)}"
     )
     try:
@@ -128,12 +140,18 @@ def _rank_with_claude(oos_product, candidates, shopper, top_n):
 def _rank_fallback(oos_product, candidates, shopper, top_n):
     def score(c):
         price_gap = abs(c["price"] - oos_product["price"]) / max(oos_product["price"], 1)
-        return c["weight"] + 0.15 * max(0, 1 - price_gap)
+        base = c.get("smart_score", c["weight"])
+        return base + 0.1 * max(0, 1 - price_gap)
 
     ranked = sorted(candidates, key=score, reverse=True)[:top_n]
     ranking = []
     for c in ranked:
-        bits = [f"Same category as {oos_product['base_name']}"]
+        bits = []
+        if c.get("use_case_match"):
+            bits.append("same use as your usual pick: " +
+                        ", ".join(u.replace("_", " ") for u in c["use_case_match"]))
+        else:
+            bits.append(f"same category as {oos_product['base_name']}")
         diff = c["price"] - oos_product["price"]
         if diff < 0:
             bits.append(f"Rs. {-diff} cheaper")
@@ -141,6 +159,12 @@ def _rank_fallback(oos_product, candidates, shopper, top_n):
             bits.append(f"Rs. {diff} more")
         else:
             bits.append("same price")
+        if c.get("nutrition_note"):
+            bits.append(c["nutrition_note"])
+        if c.get("certifications"):
+            bits.append(", ".join(c["certifications"]))
+        if c.get("brand_match"):
+            bits.append(f"a {c.get('brand', 'brand')} pick, which you tend to buy")
         if shopper["diet"]:
             bits.append(", ".join(shopper["diet"]))
         if shopper["avoids_allergens"]:

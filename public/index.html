@@ -233,6 +233,10 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   .blocked-box{background:#2a1c1f;border:1px solid #4a2d2d;border-radius:9px;padding:10px 12px;margin:2px 0 8px;font-size:11.5px}
   .blocked-box .bt{color:#E08983;font-weight:700;margin-bottom:5px}.blocked-box .bi{color:#c9a0a0;padding:2px 0}.blocked-box .bi b{color:#eee}
+  .blocked-box.warn{background:#2b2413;border-color:#4a3f22}.blocked-box.warn .bt{color:#E0B96A}.blocked-box.warn .bi{color:#cbb98a}.blocked-box.warn .bi b{color:#eee}
+  .sigrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .sigchip{font-size:10.5px;font-weight:600;background:var(--accent-bg);color:var(--accent-dark);border-radius:6px;padding:3px 8px}
+  .sigchip.stock{background:var(--amber-bg);color:var(--amber)}
   .takeaway{font-size:11.5px;color:#9CA0B4;border-top:1px solid #2f3247;margin-top:10px;padding-top:10px;font-style:italic}
   .impact{background:#241f38;border:1px solid #3a3357;border-radius:10px;padding:11px 13px;margin-top:8px;font-size:11.5px;color:#C9C4E8}.impact b{color:#fff}
 
@@ -554,23 +558,38 @@ function renderPhone(stage){
 }
 function resolvedHTML(){const k=state.lastKind;
   return `<div class="offer confirm"><div class="big">${k==="accept"?"&#10003;":"&#8617;"}</div><h3>${k==="accept"?"Substitute added to your cart":"Item removed"}</h3><p>${k==="accept"?state.lastChosen.name+" replaces the out-of-stock item.":"Rs. "+state.lastAmt+" will not be charged."}</p><button class="drawer-cta" id="continueCo" style="max-width:280px;margin:14px auto 0">Continue to checkout &rarr;</button></div>`;}
+function signalChips(sig){
+  if(!sig)return"";
+  const chips=[];
+  if(sig.use_case_match&&sig.use_case_match.length)chips.push(`same use: ${sig.use_case_match.map(u=>u.replace(/_/g," ")).join(", ")}`);
+  if(sig.nutrition_note)chips.push(sig.nutrition_note);
+  (sig.certifications||[]).forEach(c=>chips.push(c.replace(/_/g," ")));
+  if(sig.brand_match)chips.push("your preferred brand");
+  if(sig.stock_level==="low")chips.push("limited stock nearby");
+  return chips.length?`<div class="sigrow">${chips.map(c=>`<span class="sigchip">${c}</span>`).join("")}</div>`:"";
+}
 function offerHTML(){return state.offer.mode==="rag"?offerHTMLrag():offerHTMLswapiq();}
 function offerHTMLrag(){
   const o=state.offer,b=o.best;
   if(!b)return `<div class="offer rag"><div class="top"><b>No match found</b><span class="powered">QuickCart standard (RAG)</span></div><p class="lead">${o.oos.name} is out of stock and similarity search found nothing close.</p><button class="fixbtn" id="fixBtn">Turn on SwapIQ &rarr;</button></div>`;
   const risk=b.unsafe?`<div class="risk"><b>Allergen risk.</b> This contains ${b.allergens.join(", ")}. QuickCart's similarity search has no model of this shopper's allergies, so it recommends it anyway.</div>`:`<div class="risk" style="background:var(--ground);border-color:var(--line);color:var(--soft)">Safe this time, but nothing was checked. Similarity is not safety.</div>`;
+  const stockNote=b.stock_level==="out"?`<div class="risk"><b>Also out of stock.</b> This item shows out of stock at your store right now. Similarity search has no inventory awareness either, a second, independent failure.</div>`
+    :b.stock_level==="low"?`<div class="sigrow"><span class="sigchip stock">limited stock nearby</span></div>`:"";
   return `<div class="offer rag"><div class="top"><b>Recommended replacement</b><span class="powered">QuickCart standard (RAG)</span></div>
     <p class="lead">${o.oos.name} is out of stock. Closest match by similarity:</p>
     <div class="pick"><div class="th" style="background:${tintP(b)}">${productIcon(b,'80%')}</div><div class="grow"><div class="nm">${b.name}</div><div class="why">${b.reason}</div><span class="simchip">${b.similarity} cosine similarity</span></div></div>
-    ${risk}<button class="fixbtn" id="fixBtn">Turn on SwapIQ to fix this &rarr;</button></div>`;
+    ${risk}${stockNote}<button class="fixbtn" id="fixBtn">Turn on SwapIQ to fix this &rarr;</button></div>`;
 }
 function offerHTMLswapiq(){
   const o=state.offer;
-  if(!o.best)return `<div class="offer"><div class="top"><b>1 item is out of stock</b><span class="powered">SwapIQ</span></div><p class="lead">${o.oos.name} is unavailable and no substitute is safe for your profile. We've refunded it.</p><div class="oactions"><button class="obtn oaccept" id="okBtn">Got it</button></div></div>`;
+  if(!o.best){
+    const unav=o.unavailable_count?`<p class="lead" style="margin-top:8px">${o.unavailable_count} other option${o.unavailable_count>1?"s are":" is"} safe for you but out of stock at this store right now.</p>`:"";
+    return `<div class="offer"><div class="top"><b>1 item is out of stock</b><span class="powered">SwapIQ</span></div><p class="lead">${o.oos.name} is unavailable and no safe, in-stock substitute exists right now. We've refunded it.</p>${unav}<div class="oactions"><button class="obtn oaccept" id="okBtn">Got it</button></div></div>`;
+  }
   const b=o.best,diff=b.price-o.oos.price,delta=diff<0?`Rs. ${-diff} less`:diff>0?`Rs. ${diff} more`:"same price";
   return `<div class="offer"><div class="top"><b>1 item is out of stock</b><span class="powered">Powered by SwapIQ</span></div>
     <p class="lead">${o.oos.name} just ran out. Here's a safe replacement:</p>
-    <div class="pick"><div class="th" style="background:${tintP(b)}">${productIcon(b,'80%')}</div><div class="grow"><div class="nm">${b.name}</div><div class="why">${b.reason}</div><span class="safe">Safe for you &middot; Rs. ${b.price} (${delta})</span></div></div>
+    <div class="pick"><div class="th" style="background:${tintP(b)}">${productIcon(b,'80%')}</div><div class="grow"><div class="nm">${b.name}</div><div class="why">${b.reason}</div><span class="safe">Safe for you &middot; Rs. ${b.price} (${delta})</span>${signalChips(b.signals)}</div></div>
     <div class="oactions"><button class="obtn oaccept" id="accBtn">Accept substitute</button><button class="obtn orefund" id="refBtn">Refund</button></div>
     ${o.alternatives.length?`<details class="alts"><summary>Other safe options (${o.alternatives.length})</summary>${o.alternatives.map(a=>`<div class="altline"><div class="grow"><div class="nm">${a.name} &middot; Rs. ${a.price}</div><div class="r">${a.reason}</div></div><button data-alt="${a.id}">Choose</button></div>`).join("")}</details>`:""}
     <details class="whyx"><summary>Why is this safe? See the proof</summary><div class="proof">${o.best.paths.join("\n")}</div></details></div>`;
@@ -614,10 +633,11 @@ async function runSwapIQ(pid){
   setStep(0,"on");await sleep(600);setStep(0,"done");renderPhone("packing");
   setStep(1,"on");
   const sc=await(await fetch("/api/safety-check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({product_id:pid,shopper_id:state.shopperId,learned:state.learned})})).json();
-  setStep(1,"done",`${sc.checked_count} candidates checked, ${sc.blocked_count} unsafe removed`,`deterministic - ${sc.graph_ms} ms`);
+  setStep(1,"done",`${sc.checked_count} candidates checked, ${sc.blocked_count} unsafe, ${sc.unavailable_count} out of stock here`,`deterministic - ${sc.graph_ms} ms`);
   let ex="";
-  if(sc.blocked.length)ex+=`<div class="blocked-box"><div class="bt">Removed before the AI saw them</div>${sc.blocked.slice(0,4).map(b=>`<div class="bi"><b>${b.name}</b> - ${b.reason}</div>`).join("")}</div>`;
+  if(sc.blocked.length)ex+=`<div class="blocked-box"><div class="bt">Unsafe, removed before the AI saw them</div>${sc.blocked.slice(0,4).map(b=>`<div class="bi"><b>${b.name}</b> - ${b.reason}</div>`).join("")}</div>`;
   if(sc.naive&&sc.naive.unsafe)ex+=`<div class="blocked-box"><div class="bt">RAG would have picked this (now blocked)</div><div class="bi"><b>${sc.naive.name}</b> - contains ${sc.naive.allergens.join(", ")}, unsafe for this customer</div></div>`;
+  if(sc.unavailable&&sc.unavailable.length)ex+=`<div class="blocked-box warn"><div class="bt">Safe, but not offered: also out of stock right now</div>${sc.unavailable.slice(0,3).map(u=>`<div class="bi"><b>${u.name}</b></div>`).join("")}</div>`;
   $("#engExtra").innerHTML=ex;await sleep(500);
   setStep(2,"on","Claude is writing the recommendation...");renderPhone("thinking");
   const o=await(await fetch("/api/swap-offer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({product_id:pid,shopper_id:state.shopperId,learned:state.learned})})).json();

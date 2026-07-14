@@ -135,6 +135,12 @@ POST <span class="k">/v1/swap-offer</span>
   <div class="sec">Live on this store</div>
   <div class="tiles" id="tiles"></div>
 
+  <div class="sec">Business &amp; operations signals</div>
+  <div class="card" style="margin-bottom:4px">
+    <p class="sub" style="margin-bottom:12px">Ranking weighs more than safety: functional fit, nutrition, certifications and real store stock decide which safe candidate is offered. Margin and clearance are visible here to the operator, never mentioned to the shopper.</p>
+    <div class="tiles" id="bizTiles"></div>
+  </div>
+
   <div class="sec">Apps on the graph</div>
   <div class="apps" id="apps"></div>
 
@@ -204,6 +210,11 @@ function renderTiles(){
     <div class="tile"><div class="k">Stockouts handled</div><div class="v">${log.length}</div><div class="n">this demo session</div></div>
     <div class="tile"><div class="k">Revenue recovered</div><div class="v">Rs. ${saved.toLocaleString("en-IN")}</div><div class="n">${log.length?Math.round(acc/log.length*100):0}% acceptance</div></div>
     <div class="tile"><div class="k">Listings flagged</div><div class="v">${PLAT.listings_with_issues}</div><div class="n">${PLAT.critical} critical</div></div>`;
+  $("#bizTiles").innerHTML=`
+    <div class="tile"><div class="k">Fulfilling store</div><div class="v" style="font-size:16px">${PLAT.store_id}</div><div class="n">1 of 3 dark stores modeled</div></div>
+    <div class="tile bad"><div class="k">Out of stock here</div><div class="v">${PLAT.store_out_pct}%</div><div class="n">of catalog, right now</div></div>
+    <div class="tile"><div class="k">Avg margin</div><div class="v">${PLAT.avg_margin_pct}%</div><div class="n">across the catalog</div></div>
+    <div class="tile"><div class="k">Clearance SKUs</div><div class="v">${PLAT.clearance_skus}</div><div class="n">nudged when safe and in stock</div></div>`;
 }
 function renderApps(){
   const A=[

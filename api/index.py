@@ -16,10 +16,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
-from data_gen import INGREDIENT_ALLERGENS, generate_catalog, generate_shoppers
+from data_gen import (INGREDIENT_ALLERGENS, STORES, generate_catalog,
+                      generate_shoppers, generate_store_stock)
 from graph_core import build_graph, updated_weight
 from graph_backend import create_graph_backend
 from agent import claude_available, get_api_key, rank_and_explain
+from commerce_signals import enrich_candidates
 import listings as listing_qa
 
 app = FastAPI(title="SwapIQ API")
@@ -29,6 +31,8 @@ NX_G = build_graph(catalog)
 graph_backend = create_graph_backend(NX_G, catalog)
 shoppers = generate_shoppers()
 products_by_id = {p["id"]: p for p in catalog}
+store_stock = generate_store_stock(catalog)
+STORE_ID = STORES[0]
 
 DEMO_CARTS = {
     "S1": ["Almond Milk Unsweetened", "Whole Wheat Bread", "Salted Potato Chips"],
@@ -106,6 +110,7 @@ def bootstrap():
     return {
         "claude": claude_available(),
         "graph": graph_backend.health(),
+        "store": STORE_ID,
         "shoppers": [
             {"id": s["id"], "name": s["name"],
              "avoids": [a.replace("_", " ") for a in s["avoids_allergens"]],
@@ -132,6 +137,7 @@ def rag_offer(req: OfferRequest):
 
     def entry(p):
         return {**_slim(p), "similarity": _sim_display(oos, p), "unsafe": _is_unsafe(p, shopper),
+                "stock_level": store_stock.get(STORE_ID, {}).get(p["id"], "high"),
                 "reason": f"Nearest match to {oos['name']} by embedding similarity"}
 
     picks = [entry(p) for p in ranked]
@@ -154,13 +160,18 @@ def safety_check(req: OfferRequest):
     t0 = time.perf_counter()
     safe, blocked = graph_backend.safe_candidates(oos["id"], shopper, req.learned)
     graph_ms = round((time.perf_counter() - t0) * 1000, 1)
+    enriched_safe, unavailable = enrich_candidates(
+        safe, oos, shopper, store_stock, STORE_ID, products_by_id)
     naive = _naive_pick(oos)
-    naive_out = {**_slim(naive), "unsafe": _is_unsafe(naive, shopper)} if naive else None
+    naive_out = {**_slim(naive), "unsafe": _is_unsafe(naive, shopper),
+                 "stock_level": store_stock.get(STORE_ID, {}).get(naive["id"], "high")} if naive else None
     return {
         "oos": _slim(oos),
-        "safe_count": len(safe), "blocked_count": len(blocked),
+        "safe_count": len(enriched_safe), "blocked_count": len(blocked),
+        "unavailable_count": len(unavailable),
         "checked_count": len(safe) + len(blocked), "graph_ms": graph_ms,
         "blocked": [{"name": b["name"], "reason": b["blocked_reason"]} for b in blocked[:10]],
+        "unavailable": [{"name": u["name"], "reason": u["blocked_reason"]} for u in unavailable[:10]],
         "naive": naive_out,
     }
 
@@ -173,28 +184,41 @@ def swap_offer(req: OfferRequest):
     t0 = time.perf_counter()
     safe, blocked = graph_backend.safe_candidates(oos["id"], shopper, req.learned)
     graph_ms = round((time.perf_counter() - t0) * 1000, 1)
+    enriched_safe, unavailable = enrich_candidates(
+        safe, oos, shopper, store_stock, STORE_ID, products_by_id)
 
     naive = _naive_pick(oos)
-    naive_out = {**_slim(naive), "unsafe": _is_unsafe(naive, shopper)} if naive else None
+    naive_out = {**_slim(naive), "unsafe": _is_unsafe(naive, shopper),
+                 "stock_level": store_stock.get(STORE_ID, {}).get(naive["id"], "high")} if naive else None
 
-    base = {"oos": _slim(oos), "safe_count": len(safe), "blocked_count": len(blocked),
+    base = {"oos": _slim(oos), "safe_count": len(enriched_safe), "blocked_count": len(blocked),
+            "unavailable_count": len(unavailable),
             "checked_count": len(safe) + len(blocked), "graph_ms": graph_ms,
             "naive": naive_out,
-            "blocked": [{"name": b["name"], "reason": b["blocked_reason"]} for b in blocked[:10]]}
+            "blocked": [{"name": b["name"], "reason": b["blocked_reason"]} for b in blocked[:10]],
+            "unavailable": [{"name": u["name"], "reason": u["blocked_reason"]} for u in unavailable[:10]]}
 
-    if not safe:
+    if not enriched_safe:
         return {**base, "best": None, "alternatives": [], "rank_s": 0, "source": None}
 
     t1 = time.perf_counter()
-    ranking = rank_and_explain(oos, safe, shopper)
+    ranking = rank_and_explain(oos, enriched_safe, shopper)
     rank_s = round(time.perf_counter() - t1, 2)
 
-    safe_by_id = {c["id"]: c for c in safe}
+    safe_by_id = {c["id"]: c for c in enriched_safe}
 
     def entry(r):
         cand = safe_by_id[r["product_id"]]
         return {**_slim(products_by_id[cand["id"]]), "reason": r["reason"],
                 "weight": cand["weight"],
+                "signals": {
+                    "use_case_match": cand.get("use_case_match", []),
+                    "certifications": cand.get("certifications", []),
+                    "stock_level": cand.get("stock_level"),
+                    "brand_match": cand.get("brand_match", False),
+                    "nutrition_note": cand.get("nutrition_note"),
+                },
+                "business": cand.get("business", {}),
                 "paths": graph_backend.explain_paths(oos["id"], cand, shopper)}
 
     best = next(r for r in ranking["ranking"] if r["product_id"] == ranking["best_id"])
@@ -334,11 +358,17 @@ def platform():
     """Platform-level snapshot for the operator console."""
     qa = qa_summary()
     graph_stats = graph_backend.stats()
+    levels = store_stock[STORE_ID]
+    out_pct = round(sum(1 for lvl in levels.values() if lvl == "out") / len(catalog) * 100, 1)
+    avg_margin = round(sum(p["margin_pct"] for p in catalog) / len(catalog), 1)
+    clearance_count = sum(1 for p in catalog if p["clearance"])
     return {"products": len(catalog), "categories": len({p["category"] for p in catalog}),
             "graph_backend": graph_backend.name, "graph_persistent": graph_backend.persistent,
             "graph_nodes": graph_stats["nodes"], "graph_edges": graph_stats["edges"],
             "listings_audited": qa["total"], "listings_with_issues": qa["with_issues"],
-            "critical": qa["critical"], "shoppers": len(shoppers)}
+            "critical": qa["critical"], "shoppers": len(shoppers),
+            "store_id": STORE_ID, "store_out_pct": out_pct,
+            "avg_margin_pct": avg_margin, "clearance_skus": clearance_count}
 
 
 @app.get("/api/health")
