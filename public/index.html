@@ -239,6 +239,17 @@
   .sigchip.stock{background:var(--amber-bg);color:var(--amber)}
   .takeaway{font-size:11.5px;color:#9CA0B4;border-top:1px solid #2f3247;margin-top:10px;padding-top:10px;font-style:italic}
   .impact{background:#241f38;border:1px solid #3a3357;border-radius:10px;padding:11px 13px;margin-top:8px;font-size:11.5px;color:#C9C4E8}.impact b{color:#fff}
+  .rankbox{border-top:1px solid #2f3247;margin-top:10px;padding-top:10px}
+  .rb-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9CA0B4;margin-bottom:8px}
+  .rb-row{display:flex;gap:10px;padding:8px 0;border-top:1px solid #262a3d}
+  .rb-row:first-child{border-top:none}
+  .rb-rank{width:24px;height:24px;border-radius:6px;background:#33364d;color:#B9B3E4;font-size:11px;font-weight:800;display:grid;place-items:center;flex-shrink:0}
+  .rb-name{font-size:12.5px;font-weight:700;color:#E8E9F2;margin-bottom:5px}
+  .rb-chips{display:flex;flex-wrap:wrap;gap:5px}
+  .rb-chip{font-size:10px;font-weight:600;background:#2a2d40;color:#B9C0D6;border-radius:5px;padding:2px 7px}
+  .rb-chip.dim{color:#6f7390}
+  .rb-chip.warn{background:#3a2f18;color:#E0B96A}
+  .rb-chip.biz{background:#2a2440;color:#B9A0E8;border:1px dashed #4a3f6a}
 
   .modal-back{position:fixed;inset:0;background:rgba(20,22,40,.45);z-index:90;display:none;align-items:center;justify-content:center;padding:20px}
   .modal-back.show{display:flex}
@@ -558,6 +569,26 @@ function renderPhone(stage){
 }
 function resolvedHTML(){const k=state.lastKind;
   return `<div class="offer confirm"><div class="big">${k==="accept"?"&#10003;":"&#8617;"}</div><h3>${k==="accept"?"Substitute added to your cart":"Item removed"}</h3><p>${k==="accept"?state.lastChosen.name+" replaces the out-of-stock item.":"Rs. "+state.lastAmt+" will not be charged."}</p><button class="drawer-cta" id="continueCo" style="max-width:280px;margin:14px auto 0">Continue to checkout &rarr;</button></div>`;}
+function rankFactorsHTML(o){
+  if(!o.best)return"";
+  const cands=[o.best,...o.alternatives];
+  const rows=cands.map((c,i)=>{
+    const s=c.signals,biz=c.business||{};
+    const chips=[`safety confidence ${c.weight.toFixed(2)}`];
+    chips.push(s.use_case_match&&s.use_case_match.length?`fit: ${s.use_case_match.map(u=>u.replace(/_/g," ")).join(", ")}`:"no use-case overlap");
+    if(s.nutrition_note)chips.push(s.nutrition_note);
+    chips.push(`${s.stock_level} stock`);
+    (s.certifications||[]).forEach(c2=>chips.push(c2.replace(/_/g," ")));
+    if(s.brand_match)chips.push("preferred brand");
+    const bizChips=[`margin ${biz.margin_pct}%`];
+    if(biz.clearance)bizChips.push("clearance stock");
+    return `<div class="rb-row"><div class="rb-rank">#${i+1}</div><div class="rb-grow">
+      <div class="rb-name">${c.name}</div>
+      <div class="rb-chips">${chips.map(x=>`<span class="rb-chip ${x==="no use-case overlap"?"dim":x.endsWith("stock")&&x!=="high stock"?"warn":""}">${x}</span>`).join("")}
+      ${bizChips.map(x=>`<span class="rb-chip biz">${x}</span>`).join("")}</div></div></div>`;
+  }).join("");
+  return `<div class="rankbox"><div class="rb-title">Ranking factors behind this order (business signals never shown to the shopper)</div>${rows}</div>`;
+}
 function signalChips(sig){
   if(!sig)return"";
   const chips=[];
@@ -591,7 +622,7 @@ function offerHTMLswapiq(){
     <p class="lead">${o.oos.name} just ran out. Here's a safe replacement:</p>
     <div class="pick"><div class="th" style="background:${tintP(b)}">${productIcon(b,'80%')}</div><div class="grow"><div class="nm">${b.name}</div><div class="why">${b.reason}</div><span class="safe">Safe for you &middot; Rs. ${b.price} (${delta})</span>${signalChips(b.signals)}</div></div>
     <div class="oactions"><button class="obtn oaccept" id="accBtn">Accept substitute</button><button class="obtn orefund" id="refBtn">Refund</button></div>
-    ${o.alternatives.length?`<details class="alts"><summary>Other safe options (${o.alternatives.length})</summary>${o.alternatives.map(a=>`<div class="altline"><div class="grow"><div class="nm">${a.name} &middot; Rs. ${a.price}</div><div class="r">${a.reason}</div></div><button data-alt="${a.id}">Choose</button></div>`).join("")}</details>`:""}
+    ${o.alternatives.length?`<details class="alts"><summary>Other safe options (${o.alternatives.length})</summary>${o.alternatives.map(a=>`<div class="altline"><div class="grow"><div class="nm">${a.name} &middot; Rs. ${a.price}</div><div class="r">${a.reason}</div>${signalChips(a.signals)}</div><button data-alt="${a.id}">Choose</button></div>`).join("")}</details>`:""}
     <details class="whyx"><summary>Why is this safe? See the proof</summary><div class="proof">${o.best.paths.join("\n")}</div></details></div>`;
 }
 function doneHTML(){const k=state.lastKind;return k==="accept"?`<div class="offer confirm"><div class="big">&#10003;</div><h3>Substitute added</h3><p>${state.lastChosen.name} is on its way. Arriving in 8 minutes.</p></div>`:`<div class="offer confirm"><div class="big">&#8617;</div><h3>Refund issued</h3><p>Rs. ${state.lastAmt} is back in your wallet.</p></div>`}
@@ -644,6 +675,7 @@ async function runSwapIQ(pid){
   state.offer=o;
   if(o.best)setStep(2,"done",`${o.safe_count} safe options ranked and explained`,`${o.source==="claude"?"Claude":"fallback"} - ${o.rank_s} s`);
   else setStep(2,"done","no safe candidate - refund issued","safety first");
+  $("#engExtra").innerHTML=ex+rankFactorsHTML(o);
   setStep(3,"on","waiting for the customer's tap");renderPhone("offer");
 }
 
