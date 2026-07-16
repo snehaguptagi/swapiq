@@ -30,12 +30,24 @@ INGREDIENT_ALLERGENS = {
     "sesame": "sesame", "sesame_seeds": "sesame",
     # mustard
     "mustard": "mustard",
+    # skincare/haircare conflict classes: SAME mechanism (ingredient -> conflict
+    # class), a second vertical, proving the graph is category-agnostic, not
+    # food-specific. Fragrance and sulfates are the two most common irritants
+    # dermatologists ask sensitive-skin buyers to avoid; retinoids and
+    # salicylates are real pregnancy/medical-interaction conflicts.
+    "fragrance": "fragrance", "parfum": "fragrance",
+    "sodium_lauryl_sulfate": "sulfates", "sodium_laureth_sulfate": "sulfates",
+    "dimethicone": "silicones", "cyclomethicone": "silicones",
+    "retinol": "retinoids", "retinyl_palmitate": "retinoids",
+    "salicylic_acid": "salicylates",
 }
 
-# Animal-derived: makes a product non-vegan.
+# Animal-derived: makes a product non-vegan. (Food dairy/egg + cosmetic
+# beeswax/lanolin/carmine: the SAME vegan-derivation rule below already
+# generalizes across both verticals with no extra code.)
 NON_VEGAN = {"milk_solids", "cream", "butter", "cheese", "yogurt_cultures", "eggs",
              "egg_whites", "honey", "paneer", "ghee", "khoa", "condensed_milk",
-             "whey", "casein", "milk_powder"}
+             "whey", "casein", "milk_powder", "beeswax", "lanolin", "carmine"}
 NON_VEGETARIAN = set()  # catalog is vegetarian + eggs; kept for extensibility
 
 GLUTEN_INGREDIENTS = {"wheat_flour", "barley_malt", "semolina", "maida", "rye"}
@@ -197,14 +209,49 @@ PRODUCT_TEMPLATES = [
     ("Infant Formula", "baby", ["milk_powder", "vegetable_oil"], 640),
 ]
 
+# ---- Second vertical: skincare and haircare. Same template shape, same
+# generate_catalog() code path, same graph. This is the proof that the
+# platform generalizes across ecommerce categories, not just grocery: an
+# "allergen" here is a dermatological irritant, and nothing downstream
+# (graph, ranking, compliance QA, recall) needed a single line changed. ----
+BEAUTY_TEMPLATES = [
+    # ---- Cleansers ----
+    ("Gentle Foaming Cleanser", "skincare_cleanser", ["water", "glycerin", "cocamidopropyl_betaine", "fragrance"], 450),
+    ("Fragrance Free Cleanser", "skincare_cleanser", ["water", "glycerin", "ceramides"], 520),
+    ("Salicylic Acid Cleanser", "skincare_cleanser", ["water", "salicylic_acid", "glycerin"], 480),
+    # ---- Moisturizers ----
+    ("Daily Moisturizer SPF 15", "skincare_moisturizer", ["water", "glycerin", "dimethicone", "fragrance"], 650),
+    ("Ceramide Repair Cream", "skincare_moisturizer", ["water", "ceramides", "shea_butter", "glycerin"], 890),
+    ("Oil Free Gel Moisturizer", "skincare_moisturizer", ["water", "glycerin", "niacinamide"], 590),
+    ("Rich Night Cream", "skincare_moisturizer", ["water", "shea_butter", "beeswax", "fragrance"], 720),
+    # ---- Serums ----
+    ("Vitamin C Brightening Serum", "skincare_serum", ["water", "vitamin_c", "glycerin"], 950),
+    ("Retinol Renewal Serum", "skincare_serum", ["water", "retinol", "dimethicone"], 1100),
+    ("Hyaluronic Acid Serum", "skincare_serum", ["water", "hyaluronic_acid", "glycerin"], 780),
+    ("Niacinamide 10 Percent Serum", "skincare_serum", ["water", "niacinamide", "zinc_pca"], 690),
+    # ---- Sun care ----
+    ("Mineral Sunscreen SPF50", "skincare_suncare", ["water", "zinc_oxide", "glycerin"], 850),
+    ("Sheer Sunscreen Gel SPF30", "skincare_suncare", ["water", "dimethicone", "fragrance"], 690),
+    ("Tinted Sunscreen SPF40", "skincare_suncare", ["water", "zinc_oxide", "iron_oxides"], 950),
+    # ---- Hair care ----
+    ("Sulfate Free Shampoo", "haircare", ["water", "cocamidopropyl_betaine", "glycerin"], 480),
+    ("Volumizing Shampoo", "haircare", ["water", "sodium_lauryl_sulfate", "fragrance"], 380),
+    ("Argan Oil Conditioner", "haircare", ["water", "argan_oil", "dimethicone", "fragrance"], 520),
+    ("Anti Dandruff Shampoo", "haircare", ["water", "salicylic_acid", "sodium_lauryl_sulfate"], 420),
+]
+
 BRANDS = ["FreshFarm", "Nature's Own", "UrbanCart", "GoodRoots", "DailyBest",
           "Kisan Pride", "Everyday", "Farmly", "PurePick", "Harvest Co",
           "Namaste", "GreenLeaf"]
+
+BEAUTY_BRANDS = ["GlowLab", "Derm Essentials", "PureSkin Co", "Bare Roots",
+                 "Cetavera", "Nude Botanics", "Skin Theory"]
 
 # Brand-level certifications. Real certification is a producer attribute, not
 # purely derivable from ingredients, so these live on the brand, not the SKU.
 ORGANIC_BRANDS = {"GreenLeaf", "Harvest Co", "PurePick"}
 HALAL_CERTIFIED_BRANDS = {"Namaste", "Kisan Pride", "Everyday", "FreshFarm"}
+CRUELTY_FREE_BRANDS = {"Derm Essentials", "PureSkin Co", "Bare Roots", "Nude Botanics"}
 
 # Ingredients that make a listing ineligible for a Jain-friendly mark
 # (no root vegetables, no egg). Derived from ingredients, like allergens.
@@ -225,6 +272,9 @@ CATEGORY_USE_CASES = {
     "dry_fruits": ["snacking", "gifting"], "fruits_veg": ["cooking"],
     "eggs": ["breakfast", "cooking"], "beverages": ["refreshment"],
     "health": ["fitness"], "baby": ["baby_feeding"],
+    "skincare_cleanser": ["morning", "evening"], "skincare_moisturizer": ["morning", "evening"],
+    "skincare_serum": ["evening", "spot_treatment"], "skincare_suncare": ["morning", "outdoor"],
+    "haircare": ["wash_day"],
 }
 
 # Baseline nutrition per 100g/100ml by category: (calories, sugar_g, protein_g).
@@ -273,7 +323,9 @@ def _use_cases_for(base_name, category):
 
 
 def _nutrition_for(product_id, category, ingredients):
-    cal, sugar, protein = CATEGORY_NUTRITION.get(category, (200, 5, 5))
+    if category not in CATEGORY_NUTRITION:
+        return None  # non-food vertical (e.g. skincare): calories don't apply, don't fake one
+    cal, sugar, protein = CATEGORY_NUTRITION[category]
     h = _stable_hash(product_id)
     cal = round(cal * (0.9 + (h % 21) / 100))
     sugar = round(sugar * (0.85 + (h % 17) / 60), 1)
@@ -293,6 +345,8 @@ def _certifications_for(product_id, brand, ingredients):
         certs.append("halal")
     if brand in ORGANIC_BRANDS or _stable_hash(product_id) % 17 == 0:
         certs.append("organic")
+    if brand in CRUELTY_FREE_BRANDS:
+        certs.append("cruelty_free")
     return certs
 
 
@@ -315,38 +369,51 @@ def generate_store_stock(catalog, seed=7):
 
 
 def generate_catalog(seed=42):
-    """Each template gets several brand variants with price spread. ~450 SKUs."""
+    """Each template gets several brand variants with price spread.
+
+    Two verticals (grocery, beauty) run through the exact same loop with
+    different template lists and brand pools, tagged with `vertical`. Nothing
+    else in the pipeline (graph build, safety filter, ranking, ListingIQ,
+    recall) is vertical-aware; it all just reads ingredients/allergens/tags,
+    which is the point: adding a new ecommerce category is a data change,
+    not a code change.
+    """
     rng = random.Random(seed)
     products = []
     pid = 0
-    for name, category, ingredients, base_price in PRODUCT_TEMPLATES:
-        n_variants = min(rng.choice([3, 4, 4, 5]), len(BRANDS))
-        brands = rng.sample(BRANDS, n_variants)
-        for brand in brands:
-            pid += 1
-            product_id = f"P{pid:03d}"
-            price = round(base_price * rng.uniform(0.85, 1.25))
-            allergens, tags = _derive(ingredients)
-            cost_ratio = 0.55 + (_stable_hash(product_id) % 26) / 100
-            cost_price = round(price * cost_ratio)
-            products.append({
-                "id": product_id,
-                "name": f"{brand} {name}",
-                "base_name": name,
-                "brand": brand,
-                "category": category,
-                "price": price,
-                "ingredients": list(ingredients),
-                "allergens": allergens,
-                "diet_tags": tags,
-                "in_stock": True,
-                "use_cases": _use_cases_for(name, category),
-                "nutrition": _nutrition_for(product_id, category, ingredients),
-                "certifications": _certifications_for(product_id, brand, ingredients),
-                "cost_price": cost_price,
-                "margin_pct": round((price - cost_price) / price * 100, 1),
-                "clearance": _stable_hash(product_id) % 13 == 0,
-            })
+    for vertical, templates, brand_pool in (
+        ("grocery", PRODUCT_TEMPLATES, BRANDS),
+        ("beauty", BEAUTY_TEMPLATES, BEAUTY_BRANDS),
+    ):
+        for name, category, ingredients, base_price in templates:
+            n_variants = min(rng.choice([3, 4, 4, 5]), len(brand_pool))
+            brands = rng.sample(brand_pool, n_variants)
+            for brand in brands:
+                pid += 1
+                product_id = f"P{pid:03d}"
+                price = round(base_price * rng.uniform(0.85, 1.25))
+                allergens, tags = _derive(ingredients)
+                cost_ratio = 0.55 + (_stable_hash(product_id) % 26) / 100
+                cost_price = round(price * cost_ratio)
+                products.append({
+                    "id": product_id,
+                    "name": f"{brand} {name}",
+                    "base_name": name,
+                    "brand": brand,
+                    "category": category,
+                    "vertical": vertical,
+                    "price": price,
+                    "ingredients": list(ingredients),
+                    "allergens": allergens,
+                    "diet_tags": tags,
+                    "in_stock": True,
+                    "use_cases": _use_cases_for(name, category),
+                    "nutrition": _nutrition_for(product_id, category, ingredients),
+                    "certifications": _certifications_for(product_id, brand, ingredients),
+                    "cost_price": cost_price,
+                    "margin_pct": round((price - cost_price) / price * 100, 1),
+                    "clearance": _stable_hash(product_id) % 13 == 0,
+                })
     by_cat = {}
     for p in products:
         by_cat.setdefault(p["category"], []).append(p)
@@ -373,6 +440,9 @@ def generate_shoppers():
         {"id": "S4", "name": "Aditya (egg + sesame allergy)",
          "avoids_allergens": ["eggs", "sesame"], "diet": [], "budget_sensitive": False,
          "preferred_brand": "DailyBest"},
+        {"id": "S5", "name": "Meera (sensitive skin: fragrance + sulfate free)",
+         "avoids_allergens": ["fragrance", "sulfates"], "diet": [], "budget_sensitive": False,
+         "preferred_brand": "Derm Essentials"},
     ]
 
 

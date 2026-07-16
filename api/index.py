@@ -39,6 +39,7 @@ DEMO_CARTS = {
     "S2": ["Gluten Free Bread", "Basmati Rice 1kg", "Greek Yogurt Plain"],
     "S3": ["Toned Milk", "Marie Light Biscuits", "Cola 750ml"],
     "S4": ["Sesame Tahini", "Whole Wheat Bread", "Toned Milk"],
+    "S5": ["Daily Moisturizer SPF 15", "Gentle Foaming Cleanser", "Volumizing Shampoo"],
 }
 
 

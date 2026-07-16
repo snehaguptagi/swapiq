@@ -24,7 +24,9 @@ PACK = {"plant_milk": "1 L", "dairy_milk": "1 L", "yogurt": "400 g", "dairy_alte
         "snacks": "52 g", "biscuits": "250 g", "chocolate": "80 g", "staples": "1 kg",
         "pulses_dal": "1 kg", "tea_coffee": "250 g", "breakfast": "475 g", "sauces": "500 g",
         "frozen": "500 g", "dry_fruits": "500 g", "fruits_veg": "1 kg", "eggs": "6 pcs",
-        "beverages": "750 ml", "health": "500 g", "baby": "300 g"}
+        "beverages": "750 ml", "health": "500 g", "baby": "300 g",
+        "skincare_cleanser": "150 ml", "skincare_moisturizer": "50 g",
+        "skincare_serum": "30 ml", "skincare_suncare": "100 ml", "haircare": "200 ml"}
 
 
 def _hash(s):
