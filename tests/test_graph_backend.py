@@ -45,7 +45,8 @@ class NetworkXBackendContract(unittest.TestCase):
         self.assertIn("plant_milk", result["categories"])
 
     def test_graph_size_is_deterministic(self):
-        self.assertEqual({"nodes": 624, "edges": 14010}, self.backend.stats())
+        # 579 SKUs across the grocery + beauty verticals
+        self.assertEqual({"nodes": 722, "edges": 15491}, self.backend.stats())
 
 
 @unittest.skipUnless(os.environ.get("NEO4J_URI"), "NEO4J_URI is not configured")

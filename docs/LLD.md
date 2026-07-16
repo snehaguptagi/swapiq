@@ -1,6 +1,6 @@
 # SwapIQ: Low-Level Design
 
-Version 2.1 - July 2026
+Version 3.0 - July 2026
 
 ## 1. System overview
 
@@ -8,34 +8,42 @@ Version 2.1 - July 2026
 Customer browser
   public/index.html       QuickCart storefront + SwapIQ checkout moment
   public/qa.html          ListingIQ compliance test suite
-  public/console.html     Operator console, recall and graph explorer
+  public/console.html     Operator console: integration, recall, graph explorer
         |
         | JSON over HTTP
         v
 FastAPI API (api/index.py)
-  +-- data_gen.py         deterministic 508-SKU catalog and four shoppers
-  +-- graph_backend.py    Neo4j implementation + NetworkX backend contract
-  +-- graph_core.py       NetworkX fallback graph and pure learning function
-  +-- agent.py            Claude ranking/explanation + deterministic fallback
-  +-- listings.py         synthetic listing generator and compliance rules
+  +-- data_gen.py          deterministic 579-SKU, two-vertical catalog + 5 shoppers
+  +-- graph_core.py        NetworkX graph builder + pure learning function
+  +-- graph_backend.py     Neo4j backend + NetworkX backend, one shared contract
+  +-- commerce_signals.py  ranking layer ABOVE the safety graph (fit, nutrition,
+  |                         stock, certifications, brand, business economics)
+  +-- agent.py             Claude ranking/explanation + deterministic fallback
+  +-- listings.py          synthetic listing generator + compliance rule engine
         |
         +-- Neo4j: persistent production graph and Cypher safety traversal
-        +-- NetworkX: explicit zero-infrastructure fallback
+        +-- NetworkX: explicit zero-infrastructure fallback (default on Vercel)
 ```
 
-The frontend is plain HTML, CSS and JavaScript with no build step or external runtime dependency. FastAPI is compatible with local Uvicorn and Vercel serverless routing. Catalog facts and seeded swap edges are persistent in Neo4j when configured. Learned substitution weights and the decision log remain in browser `localStorage` for the demo and are sent with relevant requests.
+The frontend is plain HTML, CSS and JavaScript with no build step and no external runtime dependency (offline-safe; the only network calls are to this API). FastAPI runs under local Uvicorn and as a Vercel serverless function. The catalog and seeded graph are deterministic from a fixed seed and build once per process. Learned substitution weights and the decision log live in browser `localStorage` and are sent with the requests that need them, so the service is stateless and serverless-friendly.
 
-## 2. Runtime and deployment
+## 2. The two-layer decision model
 
-- Local command: `uvicorn api.index:app --reload --port 8000`.
-- Vercel routes `/api/*` to `api/index.py` and serves `public/` statically.
-- The catalog is deterministic from a fixed seed and builds once per API process.
-- `SWAPIQ_GRAPH_BACKEND=neo4j` requires a reachable Neo4j database and fails startup otherwise.
-- `SWAPIQ_GRAPH_BACKEND=auto` uses Neo4j when `NEO4J_URI` exists; `networkx` forces the fallback.
-- `NEO4J_AUTO_SYNC=true` idempotently upserts the complete demo graph, including `SWAP_OK` edges.
-- `ANTHROPIC_API_KEY` enables Claude. Without it, the deterministic ranker and listing fixer preserve the response shape.
+This is the single most important design decision and the reason the product is defensible.
 
-## 3. Data model
+- **Layer 1, safety (the knowledge graph).** A hard, deterministic gate. A candidate either has a graph path to something the shopper must avoid, or it does not. This layer is the only thing allowed to say "no", and nothing it rejects ever reaches the LLM. It is implemented as graph traversal so it is provable and auditable, not a score.
+- **Layer 2, ranking (commerce_signals.py + agent.py).** Ordinary code and the LLM, running only on what Layer 1 already cleared. It decides which safe candidate is *best* using functional fit, nutrition, real stock, certifications, brand affinity and business economics. It can reorder; it can never override safety.
+
+Any factor whose failure is dangerous belongs in Layer 1. Any factor that only affects preference belongs in Layer 2. Keeping them separate is what lets the safety guarantee stay provable while the ranking stays rich.
+
+## 3. Runtime and deployment
+
+- Local: `python run_server.py` (honors `PORT`, defaults to 8020) or `uvicorn api.index:app --port 8000`.
+- Vercel: `vercel.json` rewrites `/api/*` to the `api/index.py` serverless function and maps `/`, `/qa.html`, `/console.html` to the static pages in `public/`. The `if not os.environ.get("VERCEL")` guard in `index.py` skips the local static mount in production, where Vercel serves the static files.
+- Graph backend selection (`SWAPIQ_GRAPH_BACKEND`): `neo4j` requires a reachable database and fails startup otherwise; `auto` (default) uses Neo4j when `NEO4J_URI` is set, else NetworkX; `networkx` forces the fallback. On Vercel with no database, leave it unset so it resolves to NetworkX.
+- `ANTHROPIC_API_KEY` enables Claude. Without it, the deterministic ranker and listing rewriter keep the same response shape.
+
+## 4. Data model
 
 ### Product
 
@@ -46,15 +54,26 @@ The frontend is plain HTML, CSS and JavaScript with no build step or external ru
   "base_name": "Almond Milk Unsweetened",
   "brand": "FreshFarm",
   "category": "plant_milk",
+  "vertical": "grocery",
   "price": 271,
   "price_tier": "mid",
   "ingredients": ["water", "almonds", "sea_salt"],
   "allergens": ["tree_nuts"],
-  "diet_tags": ["vegan", "vegetarian", "gluten_free"]
+  "diet_tags": ["vegan", "vegetarian", "gluten_free"],
+  "use_cases": ["cereal", "coffee", "cooking"],
+  "nutrition": {"calories": 49, "sugar_g": 2.8, "protein_g": 1.0},
+  "certifications": ["jain_friendly", "halal"],
+  "cost_price": 168,
+  "margin_pct": 38.0,
+  "clearance": false
 }
 ```
 
-Allergens and diet tags are derived from ingredient maps in `data_gen.py`; they are not assigned independently to products.
+`allergens`, `diet_tags`, `use_cases`, `nutrition` and `certifications` are all *derived* in `data_gen.py`, never hand-assigned per SKU, so the reasoning is honest: bad ingredient data produces a wrong-but-consistent graph, exactly as in production. `nutrition` is `null` for non-food categories rather than fabricated. `cost_price`, `margin_pct` and `clearance` are operator-only economics.
+
+### Two verticals, one pipeline
+
+The catalog spans **grocery** (508 SKUs, 24 categories) and **beauty/haircare** (71 SKUs, 5 categories), 579 SKUs and 19 brands total. `generate_catalog()` loops over `(vertical, templates, brand_pool)` pairs through one code path. In beauty, "allergen" is a dermatological conflict class (fragrance, sulfates, silicones, retinoids, salicylates), and the `NON_VEGAN` rule additionally excludes beeswax/lanolin/carmine. No graph, ranking, compliance or recall code is vertical-aware. Adding a vertical is a data change.
 
 ### Shopper
 
@@ -64,54 +83,52 @@ Allergens and diet tags are derived from ingredient maps in `data_gen.py`; they 
   "name": "Sneha (nut allergy, vegan)",
   "avoids_allergens": ["tree_nuts", "peanuts"],
   "diet": ["vegan"],
-  "budget_sensitive": false
+  "budget_sensitive": false,
+  "preferred_brand": "GreenLeaf"
 }
 ```
 
+Five personas: nut+vegan, gluten-free, budget/no-constraint, egg+sesame, and fragrance+sulfate (skincare). `preferred_brand` feeds Layer-2 brand affinity.
+
 ### Listing
 
-Listing records in `listings.py` contain title, description, claims, declared allergens, net quantity, FSSAI license, dietary mark and image count. Realistic errors are deterministically planted so rule execution is testable.
+`listings.py` records carry title, description, claims, declared allergens, net quantity, FSSAI license, dietary mark and image count. Realistic defects are deterministically planted so the rule engine has real violations to catch.
 
-## 4. Knowledge-graph schema
+## 5. Knowledge-graph schema (Layer 1)
 
 | Element | Identifier | Relationship |
 |---|---|---|
 | Product | `P001` | Source node for catalog facts |
 | Ingredient | `ing:almonds` | `(Product)-[:CONTAINS]->(Ingredient)` |
-| Allergen | `alg:tree_nuts` | `(Ingredient)-[:IS_A]->(Allergen)` |
+| Allergen / conflict class | `alg:tree_nuts`, `alg:fragrance` | `(Ingredient)-[:IS_A]->(Allergen)` |
 | Diet tag | `tag:vegan` | `(Product)-[:HAS_TAG]->(DietTag)` |
 | Category | `cat:plant_milk` | `(Product)-[:IN_CATEGORY]->(Category)` |
 | Swap edge | product pair | `(Product)-[:SWAP_OK {weight}]->(Product)` |
 
-The current dataset produces 624 nodes and 14,010 edges. Swap priors combine same base product, shared ingredients and price closeness, then yield to learned browser-session weights after customer decisions.
+The current dataset produces about 722 nodes and 15,491 edges. Swap priors combine same base product, shared ingredients and price closeness, then yield to browser-session learned weights after customer decisions. Note that Layer-2 signals (use case, nutrition, stock, certifications, brand, margin) are product/shopper attributes read directly by `commerce_signals.py`, not graph nodes; promoting them to real edges is a planned refinement (PRD Section 11).
 
-## 5. Safety traversal
+## 6. Safety traversal (Layer 1)
 
-`graph_backend.safe_candidates(oos_id, shopper, learned)` evaluates same-category candidates. In Neo4j mode a Cypher query traverses category, ingredient, allergen, diet-tag and `SWAP_OK` relationships before Python formats the cited result:
+`graph_backend.safe_candidates(oos_id, shopper, learned)` evaluates same-category candidates. In Neo4j mode a single Cypher query traverses category, ingredient, allergen, diet-tag and `SWAP_OK` relationships; NetworkX implements the identical contract in memory.
 
-1. Traverse candidate `CONTAINS -> IS_A` paths and intersect allergens with `shopper.avoids_allergens`.
-2. Require all shopper diet tags to exist in the candidate's derived tags.
-3. For budget-sensitive shoppers, enforce the configured price ceiling.
-4. Return safe candidates sorted by effective `SWAP_OK` weight plus blocked candidates with human-readable graph paths.
+1. Traverse each candidate's `CONTAINS -> IS_A` paths and intersect the allergen/conflict classes with `shopper.avoids_allergens`.
+2. Require every shopper diet tag to be present in the candidate's derived tags.
+3. For budget-sensitive shoppers, enforce the price ceiling.
+4. Return safe candidates plus blocked candidates, each with a cited, human-readable reason.
 
-This is the hard safety boundary. Blocked candidates never reach Claude.
+This is the hard safety boundary. Blocked candidates never reach Layer 2 or the LLM.
 
-## 6. Ranking and explanation
+## 7. Commerce-signals ranking (Layer 2)
 
-`agent.rank_and_explain()` sends the top safe candidates to `claude-opus-4-8` using a structured JSON schema:
+`commerce_signals.enrich_candidates()` runs on the safe set only. It:
 
-```json
-{
-  "best_id": "P123",
-  "ranking": [
-    {"product_id": "P123", "reason": "Nut-free vegan option at nearly the same price."}
-  ]
-}
-```
+1. Splits out candidates that are safe but out of stock at the fulfilling store into a distinct `unavailable` bucket (not confused with unsafe).
+2. Attaches, per candidate: `use_case_match` (functional fit vs the out-of-stock item), `nutrition_note` (comparable / lower sugar / calorie delta; absent for non-food), `stock_level`, `certifications`, `brand_match`, and operator-only `business` (`margin_pct`, `clearance`).
+3. Computes a composite `smart_score` (safety weight 0.55, functional fit 0.18, in-stock 0.10, brand match 0.08, clearance 0.05, margin up to 0.04) and sorts.
 
-Returned IDs are validated against the supplied candidate set. Missing credentials, network failures, refusals, malformed JSON or invalid IDs trigger the deterministic fallback.
+`agent.rank_and_explain()` then sends the top safe-and-available candidates to `claude-opus-4-8` with a structured JSON schema and an explicit instruction never to mention margin, cost or clearance to the shopper. The deterministic fallback reproduces the same ordering and a templated reason when Claude is unavailable.
 
-## 7. Learning loop
+## 8. Learning loop
 
 `updated_weight(old, accepted, lr=0.25)` uses bounded exponential updates:
 
@@ -120,72 +137,58 @@ accept:  new = old + 0.25 * (1 - old)
 decline: new = old - 0.25 * old
 ```
 
-The browser persists `{edge_key: {weight, decisions}}` and passes it to offer, graph and decision endpoints. Server-side storage is deliberately omitted in the demo; production moves this state to a tenant/store scoped database.
+The browser persists `{edge_key: {weight, decisions}}` and passes it to the offer, graph and decision endpoints. Server-side storage is omitted in the demo; production moves this to tenant/store-scoped storage.
 
-## 8. ListingIQ rule engine
+## 9. ListingIQ rule engine
 
-The compliance pipeline separates decision logic from language generation:
+Separates decision from language, the same principle as the two-layer model:
 
-1. `generate_listings()` derives listing content from the catalog and inserts deterministic defects.
-2. `audit_listing()` runs rule checks for undeclared allergens, false vegan/gluten-free claims, prohibited marketing claims, missing FSSAI license or net quantity, dietary-mark mismatch and insufficient images.
+1. `generate_listing()` derives listing content from the catalog and inserts deterministic defects.
+2. `audit()` runs deterministic rules: undeclared allergens, false vegan/gluten-free claims, prohibited marketing claims, missing FSSAI license or net quantity, dietary-mark mismatch, insufficient images.
 3. `/api/audit` returns score, severity, rule ID, evidence and fix.
-4. `/api/fix` asks Claude to rewrite the listing while deterministic findings remain authoritative; fallback rewriting keeps the workflow available offline.
+4. `/api/fix` asks Claude to rewrite the listing; the deterministic findings remain authoritative, and a fallback rewrite keeps it working offline. Runs across both verticals with no rule changes.
 
-## 9. Recall propagation
+## 10. Recall propagation
 
-`GET /api/recall?ingredient=almonds` normalizes the ingredient key and returns linked SKUs, categories, listing count, mapped allergen and shopper profiles at risk. Neo4j mode executes the ingredient-to-product/category/allergen traversal in Cypher. NetworkX mode implements the same backend contract from in-memory catalog facts.
+`GET /api/recall?ingredient=<name>` returns the linked SKUs, categories, listing count, mapped allergen and at-risk shopper profiles. Neo4j executes the ingredient-to-product/category/allergen traversal in Cypher; NetworkX implements the same contract from in-memory facts.
 
-## 10. API contract
+## 11. API contract
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/api/bootstrap` | Products, shoppers, demo carts and Claude availability |
-| POST | `/api/rag-offer` | Similarity-only comparison recommendation |
-| POST | `/api/safety-check` | Deterministic graph filtering without an LLM call |
-| POST | `/api/swap-offer` | Safe candidates, ranking, explanation and baseline comparison |
+| GET | `/api/bootstrap` | Products, shoppers, demo carts, store id, Claude and graph status |
+| POST | `/api/rag-offer` | Similarity-only baseline recommendation (the A/B comparison) |
+| POST | `/api/safety-check` | Deterministic filtering; returns safe / blocked / unavailable counts, no LLM |
+| POST | `/api/swap-offer` | Safe candidates, Layer-2 signals, Claude ranking + explanation |
 | POST | `/api/decide` | Pure learned-weight update |
-| POST | `/api/graph` | Product-centered graph nodes and edges for canvas rendering |
+| POST | `/api/graph` | Product-centered nodes and edges for the canvas explorer |
 | GET | `/api/qa-summary` | Aggregate ListingIQ scores and issue counts |
 | GET | `/api/audit?product_id=P001` | Full listing audit for one product |
 | POST | `/api/fix` | Corrected listing generated from cited findings |
 | GET | `/api/recall?ingredient=almonds` | Recall impact across linked catalog entities |
-| GET | `/api/platform` | Console metrics for catalog, graph and listing QA |
+| GET | `/api/platform` | Console metrics: catalog, graph, listing QA, store stock, margin, clearance |
 | GET | `/api/health` | Readiness plus active graph backend and persistence state |
 
-## 11. Frontend state and flows
+`safe`, `blocked` and `unavailable` counts always sum to `checked`. `swap-offer` candidates carry `signals` (customer-facing) and `business` (operator-facing) separately.
 
-### QuickCart
+## 12. Frontend
 
-`public/index.html` maintains shopper, mode, safe-only filter, cart, category, search, order and offer state in one client object. It renders the full home page, category/search results, cart drawer, stockout moment and checkout views. The engine control is kept in a small demo dock so the shopping header remains consumer-facing.
+### QuickCart (`public/index.html`)
 
-### ListingIQ
+One client state object holds shopper, engine mode (RAG vs SwapIQ), safe-only filter, cart, category, search, order and offer. It renders the multi-section home (banner, category tiles, per-category rails), category/search views, cart drawer, the pre-checkout substitution "moment" (customer phone on one side, the SwapIQ engine and ranking-factors panel on the other), checkout and confirmation. Category labels, colors, pack sizes and product icons all fall back gracefully, so new categories render without frontend changes.
 
-`public/qa.html` loads summary data, filters listings by severity, opens detailed audits and calls the fix endpoint. Charts and results are dependency-free.
+### ListingIQ (`public/qa.html`)
 
-### Console
+Catalog-wide QA scoreboard with severity tiles and a per-listing report (findings, cited rules, fixes, AI rewrite). Covers every vertical automatically.
 
-`public/console.html` combines `/api/platform`, `/api/bootstrap`, `/api/recall` and `/api/graph` into the integration animation, platform metrics, app catalog, recall report and canvas graph explorer.
+### Console (`public/console.html`)
 
-## 12. Neo4j backend and fallback
+Operator front door: a simulated store-connection flow with a live-building graph, platform and business/operations metrics, recall propagation, the graph explorer, and links to the store and ListingIQ as apps on the shared graph.
 
-| Neo4j mode | NetworkX fallback |
-|---|---|
-| Persistent Product, Ingredient, Allergen, DietTag and Category nodes | Same schema represented in an in-memory `DiGraph` |
-| Persistent weighted `SWAP_OK` relationships | Seeded edges rebuilt per process |
-| Cypher safety, graph-view and recall queries | Equivalent Python traversals |
-| Aura or self-hosted Neo4j credentials required | No external infrastructure |
-| Required mode fails fast on connection or empty-database errors | Explicit mode for offline demos and tests |
+## 13. Tests
 
-`graph_backend.py` is the shared contract. `neo4j_loader.py` calls the same production backend to upsert all 508 products and 14,010 relationships. `tests/test_graph_backend.py` asserts identical safe/blocked sets and graph counts between Neo4j and NetworkX. Hosted deployments are Neo4j-powered only after Neo4j/Aura environment variables are configured; `/api/health` is the authoritative runtime signal.
+`tests/test_graph_backend.py` asserts the NetworkX and Neo4j backends return identical safe/blocked sets and identical graph counts, so the fallback is a true parity implementation, not an approximation.
 
-## 13. Verification
+## 14. Planned (see PRD Section 11)
 
-- Python modules compile with `python -m py_compile`.
-- `/api/bootstrap` returns 508 products, 24 categories and four shoppers.
-- `/api/platform` reports 624 nodes, 14,010 edges and all 508 listings audited.
-- `/api/health` reports `backend: neo4j`, `persistent: true` in the verified Neo4j run.
-- NetworkX contract tests pass without infrastructure; Neo4j parity tests pass against Neo4j 5.26.
-- The hero safety case returns 16 safe and 5 blocked candidates from both backends.
-- Desktop and 390-pixel mobile layouts render without horizontal page overflow.
-- Browser-tested flow: search -> cart -> RAG risk -> SwapIQ safe offer -> accept -> checkout -> order placed.
-- Browser console contains no errors or warnings during the verified journey.
+Post-purchase returns/exchange (reusing the substitution traversal), a third compatibility-shaped vertical (electronics), an explicit config-driven attribute schema, and time-series console insights.
