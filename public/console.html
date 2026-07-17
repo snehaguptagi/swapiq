@@ -38,6 +38,9 @@
   #hub a .hub-card{transition:transform .15s}
   #hub a:hover .hub-rect{stroke:var(--accent);stroke-width:2}
   .hub-cap{text-align:center;color:var(--faint);font-size:12.5px;margin:10px 0 2px}
+  #hub .spoke{stroke-dasharray:5 11;animation:flow 1.3s linear infinite}
+  @keyframes flow{to{stroke-dashoffset:-16}}
+  @media(prefers-reduced-motion:reduce){#hub .spoke{animation:none;opacity:.5}}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
   /* integration */
   .integ{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:stretch}
@@ -184,7 +187,8 @@ function renderHub(){
   apps.forEach((a,i)=>{
     const th=(-90+i*(360/apps.length))*Math.PI/180;
     const x=cx+rx*Math.cos(th),y=cy+ry*Math.sin(th),lx=x-w/2;
-    lines+=`<line x1="${cx}" y1="${cy}" x2="${x.toFixed(0)}" y2="${y.toFixed(0)}" stroke="#DADBE6" stroke-width="2"/>`;
+    lines+=`<line x1="${cx}" y1="${cy}" x2="${x.toFixed(0)}" y2="${y.toFixed(0)}" stroke="#E6E7EF" stroke-width="3"/>`+
+           `<line class="spoke" x1="${cx}" y1="${cy}" x2="${x.toFixed(0)}" y2="${y.toFixed(0)}" stroke="#9C93E8" stroke-width="2.5" style="animation-delay:${(i*0.18).toFixed(2)}s"/>`;
     nodes+=`<a href="${a.h}"><g class="hub-card">
       <rect class="hub-rect" x="${lx.toFixed(0)}" y="${(y-h/2).toFixed(0)}" width="${w}" height="${h}" rx="15" fill="#fff" stroke="#E6E7EF"/>
       <circle cx="${(lx+32).toFixed(0)}" cy="${y.toFixed(0)}" r="17" fill="${a.c}"/>
