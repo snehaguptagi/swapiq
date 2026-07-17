@@ -30,6 +30,8 @@
   .hero h1{font-size:28px;letter-spacing:-.025em;margin:6px 0 6px;max-width:20ch}
   .hero p{color:var(--soft);font-size:14.5px;max-width:64ch}
   .sec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin:26px 0 12px}
+  .sec-note{text-transform:none;letter-spacing:0;font-weight:500;color:var(--faint);margin-left:8px;font-size:11.5px}
+  .mini-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
   /* integration */
   .integ{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:stretch}
@@ -62,8 +64,9 @@
   .tile .v{font-size:25px;font-weight:800;letter-spacing:-.02em;margin-top:3px;font-variant-numeric:tabular-nums}
   .tile .n{font-size:11.5px;color:var(--faint);margin-top:1px}
   /* apps */
-  .apps{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
-  @media(max-width:720px){.apps{grid-template-columns:1fr}}
+  .apps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:820px){.apps{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.apps{grid-template-columns:1fr}}
   .app{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:6px}
   .app.live{border-color:#D6D0F0}
   .app .top{display:flex;align-items:center;gap:9px}
@@ -99,54 +102,45 @@
 
 <main>
   <div class="hero">
-    <div class="eyebrow">One graph, many apps</div>
+    <div class="eyebrow">One graph. Every safety workflow.</div>
     <h1>The product safety graph for commerce</h1>
-    <p>SwapIQ ingests any store's catalog and builds a knowledge graph of products, ingredients, allergens and diets. Substitution, compliance QA, recall propagation and safe search all run on top of it. Connect a store below and watch it come alive.</p>
+    <p>Connect a catalog, the graph builds itself, and every app below runs on it.</p>
   </div>
 
-  <div class="sec">Integration</div>
+  <div class="tiles" id="tiles"></div>
+
+  <div class="sec">Apps on one graph</div>
+  <div class="apps" id="apps"></div>
+
+  <div class="sec">Connect a store</div>
   <div class="integ">
     <div class="card">
-      <h3>Connect a store</h3>
-      <p class="sub">Pick a platform. SwapIQ pulls the catalog and builds the graph automatically. No schema work.</p>
       <div class="platforms" id="platforms">
         <button class="plat sel" data-p="Shopify"><span class="d"></span>Shopify</button>
         <button class="plat" data-p="WooCommerce"><span class="d"></span>WooCommerce</button>
         <button class="plat" data-p="Blinkit feed"><span class="d"></span>Blinkit feed</button>
-        <button class="plat" data-p="CSV upload"><span class="d"></span>CSV upload</button>
+        <button class="plat" data-p="CSV upload"><span class="d"></span>CSV</button>
       </div>
-      <button class="connect" id="connectBtn">Connect QuickCart</button>
+      <button class="connect" id="connectBtn">Connect QuickCart &rarr;</button>
       <div class="steps" id="steps"></div>
       <div class="live-badge" id="liveBadge"><span class="dot"></span>SwapIQ is live on QuickCart</div>
     </div>
-    <div class="card" style="display:flex;flex-direction:column;gap:10px">
-      <h3 style="font-size:14px">Or drop in one line</h3>
-      <div class="snippet"><span class="c">// client SDK, in your storefront</span>
-&lt;script src=<span class="k">"https://cdn.swapiq.ai/v1.js"</span>
+    <div class="card" style="display:flex;flex-direction:column;gap:8px">
+      <div class="mini-lbl">Or one line in your storefront</div>
+      <div class="snippet"><span class="c">// SDK</span>
+&lt;script src=<span class="k">"cdn.swapiq.ai/v1.js"</span>
   data-store=<span class="k">"quickcart"</span>&gt;&lt;/script&gt;
 
-<span class="c">// or call the API on a stockout</span>
-POST <span class="k">/v1/swap-offer</span>
-{ out_of_stock_sku, shopper_id }</div>
-      <p style="font-size:11.5px;color:var(--faint)">Stateless. No PII stored. One call per stockout.</p>
+<span class="c">// or one API call on a stockout</span>
+POST <span class="k">/v1/swap-offer</span></div>
     </div>
   </div>
 
-  <div class="sec">Live on this store</div>
-  <div class="tiles" id="tiles"></div>
+  <div class="sec">Operations signals <span class="sec-note">margin and clearance stay operator-only</span></div>
+  <div class="tiles" id="bizTiles"></div>
 
-  <div class="sec">Business &amp; operations signals</div>
-  <div class="card" style="margin-bottom:4px">
-    <p class="sub" style="margin-bottom:12px">Ranking weighs more than safety: functional fit, nutrition, certifications and real store stock decide which safe candidate is offered. Margin and clearance are visible here to the operator, never mentioned to the shopper.</p>
-    <div class="tiles" id="bizTiles"></div>
-  </div>
-
-  <div class="sec">Apps on the graph</div>
-  <div class="apps" id="apps"></div>
-
-  <div class="sec">Recall propagation</div>
+  <div class="sec">Recall <span class="sec-note">one input, every affected SKU, listing and shopper</span></div>
   <div class="card">
-    <p class="sub" style="font-size:12.5px;color:var(--soft);margin-bottom:12px">A supplier flags a contaminated ingredient. One graph traversal finds every affected SKU, listing, and at-risk shopper instantly, work that takes a catalog team days.</p>
     <div class="recall-in">
       <select id="recallSel"></select>
       <button id="recallBtn">Trigger recall</button>
@@ -158,7 +152,7 @@ POST <span class="k">/v1/swap-offer</span>
   <div class="card">
     <select class="gsel" id="graphSel"></select>
     <div class="legend"><span><i style="background:#5A4FB5"></i>product</span><span><i style="background:#B45309"></i>ingredient</span><span><i style="background:#B3403A"></i>allergen</span><span><i style="background:#177A42"></i>diet tag</span><span><i style="background:#5D6374"></i>category</span></div>
-    <canvas id="graphCanvas" height="420"></canvas>
+    <canvas id="graphCanvas" height="480"></canvas>
   </div>
 </main>
 <footer><div class="foot">SwapIQ, one product safety graph. Substitution recovers sales, compliance prevents fines, recall prevents lawsuits. Synthetic demo data.</div></footer>
@@ -218,13 +212,14 @@ function renderTiles(){
 }
 function renderApps(){
   const A=[
-    ["SwapIQ Substitution","SW","#5A4FB5","live","Turn post-order stockouts into safe, explained substitutes. Recovers revenue.","/","Open store demo"],
-    ["ListingIQ Compliance","LI","#177A42","live","Audit every listing for undeclared allergens and prohibited claims. Prevents fines.","/qa.html","Open compliance QA"],
-    ["Recall Propagation","RC","#B3403A","live","Trace a contaminated ingredient to every SKU, listing and shopper in one traversal.","#","Try it below"],
-    ["Safe Search","SS","#9A5B10","live","Filter the whole catalog to what is safe for a shopper. Try the toggle in the store.","/","In the store"],
-    ["Returns & Exchange","RX","#0C831F","live","Turn a return into a safe exchange. If a buyer reacted, infer the culprit and learn a new constraint.","/","In the store"],
+    ["Substitution","SW","#5A4FB5","live","Safe swaps for stockouts","/","Store demo"],
+    ["Compliance QA","LI","#177A42","live","Audit every listing","/qa.html","Open"],
+    ["Recall","RC","#B3403A","live","One input to every SKU","#","Below"],
+    ["Safe Search","SS","#9A5B10","live","Filter to what's safe","/","In store"],
+    ["Returns & Exchange","RX","#0C831F","live","Return, learn, exchange safely","/","In store"],
+    ["Your next app","NX","#8A8FA3","soon","Same graph, new workflow","#","Roadmap"],
   ];
-  $("#apps").innerHTML=A.map(a=>`<div class="app live"><div class="top"><span class="ic" style="background:${a[2]}">${a[1]}</span><h3>${a[0]}</h3><span class="tag on">${a[3]}</span></div><p>${a[4]}</p><a class="go" href="${a[5]}">${a[6]} &rarr;</a></div>`).join("");
+  $("#apps").innerHTML=A.map(a=>`<div class="app ${a[3]==="live"?"live":""}"><div class="top"><span class="ic" style="background:${a[2]}">${a[1]}</span><h3>${a[0]}</h3><span class="tag ${a[3]==="live"?"on":"soon"}">${a[3]}</span></div><p>${a[4]}</p><a class="go" href="${a[5]}">${a[6]} &rarr;</a></div>`).join("");
 }
 
 /* recall */
