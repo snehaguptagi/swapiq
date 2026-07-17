@@ -222,6 +222,7 @@ function renderApps(){
     ["ListingIQ Compliance","LI","#177A42","live","Audit every listing for undeclared allergens and prohibited claims. Prevents fines.","/qa.html","Open compliance QA"],
     ["Recall Propagation","RC","#B3403A","live","Trace a contaminated ingredient to every SKU, listing and shopper in one traversal.","#","Try it below"],
     ["Safe Search","SS","#9A5B10","live","Filter the whole catalog to what is safe for a shopper. Try the toggle in the store.","/","In the store"],
+    ["Returns & Exchange","RX","#0C831F","live","Turn a return into a safe exchange. If a buyer reacted, infer the culprit and learn a new constraint.","/","In the store"],
   ];
   $("#apps").innerHTML=A.map(a=>`<div class="app live"><div class="top"><span class="ic" style="background:${a[2]}">${a[1]}</span><h3>${a[0]}</h3><span class="tag on">${a[3]}</span></div><p>${a[4]}</p><a class="go" href="${a[5]}">${a[6]} &rarr;</a></div>`).join("");
 }

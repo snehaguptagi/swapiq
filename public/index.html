@@ -148,6 +148,28 @@
   .place-final:hover{background:var(--qc-dark)}
   .co-note{font-size:11.5px;color:var(--faint);text-align:center;margin-top:8px}
   .co-done{text-align:center;padding:70px 20px}.co-done .big{font-size:46px;color:var(--qc)}.co-done h2{font-size:21px;margin:8px 0 4px}.co-done p{color:var(--soft);font-size:13.5px}
+  /* returns / exchange */
+  .ret-head{margin:6px 0 16px}.ret-head h1{font-size:22px;letter-spacing:-.02em}.ret-head p{color:var(--soft);font-size:13.5px;max-width:70ch;margin-top:4px}
+  .ret-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  @media(max-width:820px){.ret-grid{grid-template-columns:1fr}}
+  .ret-lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:9px}
+  .ret-items{display:flex;flex-direction:column;gap:8px}
+  .ret-item{display:flex;align-items:center;gap:11px;border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px 12px;text-align:left;width:100%}
+  .ret-item.sel{border-color:var(--accent);background:var(--accent-bg)}
+  .ret-item .th{width:38px;height:38px;border-radius:8px;display:grid;place-items:center;flex-shrink:0}
+  .ret-item .grow{display:flex;flex-direction:column}.ret-item .nm{font-size:13px;font-weight:600}.ret-item .pr{font-size:11.5px;color:var(--faint)}
+  .ret-reasons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  @media(max-width:520px){.ret-reasons{grid-template-columns:1fr}}
+  .ret-reason{border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px 12px;text-align:left}
+  .ret-reason.sel{border-color:var(--accent);background:var(--accent-bg)}
+  .ret-reason:disabled{opacity:.5}
+  .ret-reason b{display:block;font-size:13px}.ret-reason span{font-size:11.5px;color:var(--soft)}
+  .ret-go{margin-top:16px;border:none;background:var(--accent);color:#fff;border-radius:11px;padding:12px 20px;font-size:14px;font-weight:700}
+  .ret-go:hover{background:var(--accent-dark)}.ret-go:disabled{opacity:.5}
+  .ret-empty{border:1px dashed var(--line);border-radius:12px;padding:44px 20px;text-align:center;color:var(--faint);font-size:13px}
+  .ret-learned{background:var(--green-bg);border:1px solid #C5E6D2;border-radius:10px;padding:10px 13px;margin-bottom:11px;font-size:12.5px;color:#0f5c32}
+  .ret-learned b{color:#0d5230}
+  .ret-note{background:var(--amber-bg);border:1px solid #f0ddb0;border-radius:10px;padding:10px 13px;margin-bottom:11px;font-size:12.5px;color:var(--amber)}
   /* safe-for-me toggle + cart audit */
   .safebar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:10px 15px;margin-bottom:16px}
   .safe-t{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;cursor:pointer}
@@ -326,6 +348,9 @@
 
   <!-- CHECKOUT -->
   <div id="view-checkout" class="hidden"></div>
+
+  <!-- RETURNS / EXCHANGE -->
+  <div id="view-returns" class="hidden"></div>
 </main>
 
 <div class="cartbar" id="cartbar"></div>
@@ -335,7 +360,7 @@
 <footer><div class="foot">
   <div class="foot-grid">
     <div><h4>QuickCart</h4><p>Your neighbourhood essentials store, delivered in minutes. QuickCart is a fictional commerce brand built to demonstrate SwapIQ safely and honestly.</p></div>
-    <div><h4>Useful links</h4><div class="links"><a href="/console.html">SwapIQ Console</a><a href="/qa.html">Compliance QA</a><button id="linkGraph">Knowledge graph</button><button id="linkApi">For retailers</button><button id="linkReset">Reset demo</button><a href="#">Help & support</a></div></div>
+    <div><h4>Useful links</h4><div class="links"><a href="/console.html">SwapIQ Console</a><a href="/qa.html">Compliance QA</a><button id="linkReturns">Returns &amp; exchange</button><button id="linkGraph">Knowledge graph</button><button id="linkApi">For retailers</button><button id="linkReset">Reset demo</button><a href="#">Help &amp; support</a></div></div>
     <div><h4>Popular categories</h4><div class="foot-cats"><span>Vegetables & Fruits</span><span>Dairy & Breakfast</span><span>Cold Drinks & Juices</span><span>Instant & Frozen Food</span><span>Tea, Coffee & Health Drinks</span><span>Bakery & Biscuits</span><span>Baby Care</span><span>Health & Nutrition</span></div></div>
   </div>
   <div class="foot-bottom"><span>&copy; 2026 QuickCart demo. Synthetic catalog, real product logic.</span><span>Fast delivery &middot; Safe substitutions &middot; Clear prices</span></div>
@@ -538,7 +563,7 @@ function renderCheckout(){
 }
 
 /* ---- view switch ---- */
-function setView(v){["setup","moment","checkout"].forEach(x=>$("#view-"+x).classList.toggle("hidden",x!==v));$("#cartbar").classList.toggle("hidden",v!=="setup")}
+function setView(v){["setup","moment","checkout","returns"].forEach(x=>$("#view-"+x).classList.toggle("hidden",x!==v));$("#cartbar").classList.toggle("hidden",v!=="setup")}
 $("#backBtn").onclick=()=>{state.order=null;state.oosId=null;state.offer=null;seedCart();refreshStore();setView("setup")};
 
 function resolveCart(){
@@ -708,6 +733,59 @@ $$(".modal-back").forEach(m=>m.onclick=e=>{if(e.target===m)m.classList.remove("s
 $("#linkApi").onclick=()=>openModal("apiModal");
 $("#linkGraph").onclick=()=>{openModal("graphModal");drawGraph()};
 $("#linkReset").onclick=()=>{state.learned={};state.log=[];persist();seedCart();state.order=null;state.oosId=null;state.offer=null;state.mode="rag";renderToggle();refreshStore();setView("setup");toast("Session reset.")};
+
+/* ---- returns / exchange ---- */
+const RETURN_REASONS=[["reacted","Reacted to it","I had an allergic or skin reaction"],["disliked","Didn't like it","Taste, texture or scent was not for me"],["quality","Quality issue","Damaged, expired or poor quality"],["wrong_item","Wrong item","Ordered by mistake or changed my mind"]];
+$("#linkReturns").onclick=()=>{state.returnPick=null;state.returnReason=null;state.returnOffer=null;renderReturns();setView("returns")};
+function returnableItems(){
+  // a curated "recent order" that includes an allergen-bearing item, so the
+  // "reacted -> infer the culprit" path is reachable. Beauty shopper gets a
+  // beauty order; everyone else a grocery one.
+  const beauty=state.shopperId==="S5";
+  const bases=beauty
+    ?["Daily Moisturizer SPF 15","Sulfate Free Shampoo","Gentle Foaming Cleanser"]
+    :["Almond Milk Unsweetened","Peanut Butter Crunchy","Whole Wheat Bread"];
+  return bases.map(bn=>state.data.products.find(p=>p.base_name===bn)).filter(Boolean);
+}
+function renderReturns(){
+  const items=returnableItems();
+  const pickList=items.map(p=>`<button class="ret-item ${state.returnPick===p.id?"sel":""}" data-ret="${p.id}"><span class="th" style="background:${tintP(p)}">${productIcon(p,'78%')}</span><span class="grow"><span class="nm">${p.name}</span><span class="pr">Rs. ${p.price} &middot; delivered 2 days ago</span></span></button>`).join("");
+  const reasons=RETURN_REASONS.map(r=>`<button class="ret-reason ${state.returnReason===r[0]?"sel":""}" data-reason="${r[0]}" ${state.returnPick?"":"disabled"}><b>${r[1]}</b><span>${r[2]}</span></button>`).join("");
+  $("#view-returns").innerHTML=`
+    <button class="backbtn" id="retBack">&larr; Back to store</button>
+    <div class="ret-head"><h1>Returns &amp; exchange</h1><p>Pick an item from your recent order and tell us why. SwapIQ proposes a safe exchange, not just a refund, and if you reacted to something it learns a new constraint from that return.</p></div>
+    <div class="ret-grid">
+      <div class="ret-col"><div class="ret-lbl">1 &middot; What are you returning?</div><div class="ret-items">${pickList}</div>
+        <div class="ret-lbl" style="margin-top:16px">2 &middot; Why?</div><div class="ret-reasons">${reasons}</div>
+        <button class="ret-go" id="retGo" ${state.returnPick&&state.returnReason?"":"disabled"}>Find a safe exchange</button></div>
+      <div class="ret-col"><div id="retResult"><div class="ret-empty">Your recommended exchange will appear here.</div></div></div>
+    </div>`;
+  $("#retBack").onclick=()=>setView("setup");
+  $$("#view-returns [data-ret]").forEach(b=>b.onclick=()=>{state.returnPick=b.dataset.ret;renderReturns()});
+  $$("#view-returns [data-reason]").forEach(b=>b.onclick=()=>{state.returnReason=b.dataset.reason;renderReturns()});
+  const go=$("#retGo");if(go)go.onclick=runReturn;
+}
+async function runReturn(){
+  const rid=state.returnPick,reason=state.returnReason;
+  $("#retResult").innerHTML=`<div class="ret-empty"><span class="spin" style="display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></span> Checking what is safe to exchange...</div>`;
+  const o=await(await fetch("/api/return-offer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({product_id:rid,shopper_id:state.shopperId,reason,learned:state.learned})})).json();
+  state.returnOffer=o;
+  const learned=o.inferred_constraint&&o.inferred_constraint.length?`<div class="ret-learned"><b>New constraint learned from this return:</b> avoid ${o.inferred_constraint.join(", ")}. ${o.blocked_count} option${o.blocked_count===1?"":"s"} sharing it ${o.blocked_count===1?"was":"were"} removed before ranking.</div>`:(o.note?`<div class="ret-note">${o.note}</div>`:"");
+  let body;
+  if(!o.best){
+    body=`<div class="offer"><div class="top"><b>Return: ${o.oos.name}</b><span class="powered">Powered by SwapIQ</span></div>${learned}<p class="lead">No safe exchange is available for this reason. We'll process a refund of Rs. ${o.oos.price}.</p></div>`;
+  }else{
+    const b=o.best,diff=b.price-o.oos.price,delta=diff<0?`Rs. ${-diff} less`:diff>0?`Rs. ${diff} more`:"same price";
+    body=`<div class="offer"><div class="top"><b>Return: ${o.oos.name}</b><span class="powered">Powered by SwapIQ</span></div>
+      <p class="lead">Reason: ${o.reason_label}. Recommended safe exchange:</p>${learned}
+      <div class="pick"><div class="th" style="background:${tintP(b)}">${productIcon(b,'80%')}</div><div class="grow"><div class="nm">${b.name}</div><div class="why">${b.reason}</div><span class="safe">Safe for you &middot; Rs. ${b.price} (${delta})</span>${signalChips(b.signals)}</div></div>
+      <div class="oactions"><button class="obtn oaccept" id="retAccept">Exchange for this</button><button class="obtn orefund" id="retRefund">Refund instead</button></div>
+      ${o.alternatives.length?`<details class="alts"><summary>Other safe options (${o.alternatives.length})</summary>${o.alternatives.map(a=>`<div class="altline"><div class="grow"><div class="nm">${a.name} &middot; Rs. ${a.price}</div><div class="r">${a.reason}</div>${signalChips(a.signals)}</div></div>`).join("")}</details>`:""}</div>`;
+  }
+  $("#retResult").innerHTML=body;
+  const acc=$("#retAccept");if(acc)acc.onclick=()=>{$("#retResult").innerHTML=`<div class="offer confirm"><div class="big">&#10003;</div><h3>Exchange confirmed</h3><p>${o.best.name} is on its way, and Rs. ${o.oos.price} for the returned item is credited.</p></div>`;toast("Exchange confirmed.")};
+  const ref=$("#retRefund");if(ref)ref.onclick=()=>{$("#retResult").innerHTML=`<div class="offer confirm"><div class="big">&#8617;</div><h3>Refund issued</h3><p>Rs. ${o.oos.price} credited to your wallet.</p></div>`;toast("Refund issued.")};
+}
 
 /* ---- graph ---- */
 function renderGraphSelect(){const sel=$("#graphSelect");sel.innerHTML=state.data.products.map(p=>`<option value="${p.id}" ${p.id==="P001"?"selected":""}>${p.name}</option>`).join("");sel.onchange=drawGraph}

@@ -104,6 +104,13 @@ class GraphRequest(BaseModel):
     learned: dict = Field(default_factory=dict)
 
 
+class ReturnRequest(BaseModel):
+    product_id: str
+    shopper_id: str
+    reason: str = "wrong_item"  # reacted | disliked | quality | wrong_item
+    learned: dict = Field(default_factory=dict)
+
+
 @app.get("/api/bootstrap")
 def bootstrap():
     carts = {sid: [next(p["id"] for p in catalog if p["base_name"] == b) for b in bases]
@@ -226,6 +233,100 @@ def swap_offer(req: OfferRequest):
     return {**base, "source": ranking["source"], "rank_s": rank_s, "best": entry(best),
             "alternatives": [entry(r) for r in ranking["ranking"]
                              if r["product_id"] != ranking["best_id"]]}
+
+
+RETURN_REASONS = {
+    "reacted": "Reaction to the product",
+    "disliked": "Did not like it",
+    "quality": "Quality issue",
+    "wrong_item": "Wrong item / changed mind",
+}
+
+
+@app.post("/api/return-offer")
+def return_offer(req: ReturnRequest):
+    """Post-purchase exchange. Same safety traversal as substitution, triggered
+    by a return instead of a stockout, plus one thing a stockout never has: a
+    reason for the return, which becomes a new constraint.
+
+    - reacted:  the buyer reacted to the item, so infer that its ingredient
+                conflict-classes are the likely culprit and exclude every
+                candidate that shares them. This is the graph LEARNING a new
+                safety constraint from behavior, not just reading a profile.
+    - disliked: exclude the same product; prefer a different brand.
+    - quality:  exclude the same brand.
+    - wrong_item: a straightforward safe alternative in the same category.
+    """
+    returned = products_by_id[req.product_id]
+    base_shopper = _shopper(req.shopper_id)
+    reason = req.reason if req.reason in RETURN_REASONS else "wrong_item"
+
+    eff = dict(base_shopper)
+    eff["avoids_allergens"] = list(base_shopper["avoids_allergens"])
+    inferred = []
+    exclude_bases = {returned["base_name"]}
+    exclude_brands = set()
+
+    if reason == "reacted":
+        inferred = [a for a in returned["allergens"] if a not in eff["avoids_allergens"]]
+        eff["avoids_allergens"] += inferred
+    elif reason == "quality":
+        exclude_brands = {returned["brand"]}
+    # disliked and wrong_item: same-base exclusion below is enough
+
+    t0 = time.perf_counter()
+    safe, blocked = graph_backend.safe_candidates(returned["id"], eff, req.learned)
+    graph_ms = round((time.perf_counter() - t0) * 1000, 1)
+    safe = [c for c in safe
+            if products_by_id[c["id"]]["base_name"] not in exclude_bases
+            and products_by_id[c["id"]]["brand"] not in exclude_brands]
+    if reason == "disliked":
+        # prefer a genuinely different brand than the one they disliked
+        for c in safe:
+            if products_by_id[c["id"]]["brand"] == returned["brand"]:
+                c["weight"] = round(c["weight"] * 0.7, 3)
+
+    enriched, unavailable = enrich_candidates(safe, returned, eff, store_stock, STORE_ID, products_by_id)
+
+    note = None
+    if reason == "reacted" and inferred:
+        note = ("You reported a reaction. SwapIQ inferred the likely culprit ingredient class "
+                f"({', '.join(a.replace('_', ' ') for a in inferred)}) from the returned item and "
+                "excluded every exchange option that shares it, a new safety constraint learned "
+                "from your return, not from your saved profile.")
+    elif reason == "reacted":
+        note = ("You reported a reaction, but the returned item has no declared conflict ingredient, "
+                "so SwapIQ cannot pinpoint a culprit. It suggests a different product and flags this "
+                "for review rather than guessing.")
+
+    base = {"oos": _slim(returned), "reason": reason, "reason_label": RETURN_REASONS[reason],
+            "inferred_constraint": [a.replace("_", " ") for a in inferred], "note": note,
+            "safe_count": len(enriched), "blocked_count": len(blocked),
+            "unavailable_count": len(unavailable), "graph_ms": graph_ms,
+            "blocked": [{"name": b["name"], "reason": b["blocked_reason"]} for b in blocked[:10]]}
+
+    if not enriched:
+        return {**base, "best": None, "alternatives": [], "rank_s": 0, "source": None}
+
+    t1 = time.perf_counter()
+    ranking = rank_and_explain(returned, enriched, eff)
+    rank_s = round(time.perf_counter() - t1, 2)
+    safe_by_id = {c["id"]: c for c in enriched}
+
+    def entry(r):
+        cand = safe_by_id[r["product_id"]]
+        return {**_slim(products_by_id[cand["id"]]), "reason": r["reason"], "weight": cand["weight"],
+                "signals": {"use_case_match": cand.get("use_case_match", []),
+                            "certifications": cand.get("certifications", []),
+                            "stock_level": cand.get("stock_level"),
+                            "brand_match": cand.get("brand_match", False),
+                            "nutrition_note": cand.get("nutrition_note")},
+                "business": cand.get("business", {}),
+                "paths": graph_backend.explain_paths(returned["id"], cand, eff)}
+
+    best = next(r for r in ranking["ranking"] if r["product_id"] == ranking["best_id"])
+    return {**base, "source": ranking["source"], "rank_s": rank_s, "best": entry(best),
+            "alternatives": [entry(r) for r in ranking["ranking"] if r["product_id"] != ranking["best_id"]]}
 
 
 @app.post("/api/decide")
