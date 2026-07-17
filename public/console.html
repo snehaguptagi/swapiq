@@ -32,6 +32,12 @@
   .sec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin:26px 0 12px}
   .sec-note{text-transform:none;letter-spacing:0;font-weight:500;color:var(--faint);margin-left:8px;font-size:11.5px}
   .mini-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+  .hubwrap{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:6px 10px}
+  #hub{width:100%;aspect-ratio:1000/560;height:auto;display:block}
+  #hub a{cursor:pointer}
+  #hub a .hub-card{transition:transform .15s}
+  #hub a:hover .hub-rect{stroke:var(--accent);stroke-width:2}
+  .hub-cap{text-align:center;color:var(--faint);font-size:12.5px;margin:10px 0 2px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
   /* integration */
   .integ{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:stretch}
@@ -107,10 +113,8 @@
     <p>Connect a catalog, the graph builds itself, and every app below runs on it.</p>
   </div>
 
-  <div class="tiles" id="tiles"></div>
-
-  <div class="sec">Apps on one graph</div>
-  <div class="apps" id="apps"></div>
+  <div class="hubwrap"><svg id="hub" viewBox="0 0 1000 560" role="img" aria-label="One graph, many apps"></svg></div>
+  <p class="hub-cap">Any catalog ingests into one graph. Every app reads from the same safety layer. Click an app to open it.</p>
 
   <div class="sec">Connect a store</div>
   <div class="integ">
@@ -139,7 +143,7 @@ POST <span class="k">/v1/swap-offer</span></div>
   <div class="sec">Operations signals <span class="sec-note">margin and clearance stay operator-only</span></div>
   <div class="tiles" id="bizTiles"></div>
 
-  <div class="sec">Recall <span class="sec-note">one input, every affected SKU, listing and shopper</span></div>
+  <div class="sec" id="recall">Recall <span class="sec-note">one input, every affected SKU, listing and shopper</span></div>
   <div class="card">
     <div class="recall-in">
       <select id="recallSel"></select>
@@ -165,7 +169,44 @@ let PLAT=null,DATA=null;
 async function boot(){
   PLAT=await(await fetch("/api/platform")).json();
   DATA=await(await fetch("/api/bootstrap")).json();
-  renderTiles();renderApps();renderRecallOptions();renderGraphSelect();
+  renderHub();renderBizTiles();renderRecallOptions();renderGraphSelect();
+}
+function renderHub(){
+  const cx=500,cy=280,rx=350,ry=178,w=200,h=72;
+  const apps=[
+    {n:"Substitution",s:"SW",c:"#5A4FB5",h:"/",stat:`${PLAT.products} SKUs`},
+    {n:"Compliance QA",s:"LI",c:"#177A42",h:"/qa.html",stat:`${PLAT.critical} critical caught`},
+    {n:"Recall",s:"RC",c:"#B3403A",h:"#recall",stat:"1 input → all"},
+    {n:"Safe Search",s:"SS",c:"#9A5B10",h:"/",stat:"per shopper"},
+    {n:"Returns",s:"RX",c:"#0C831F",h:"/",stat:"learns on return"},
+  ];
+  let lines="",nodes="";
+  apps.forEach((a,i)=>{
+    const th=(-90+i*(360/apps.length))*Math.PI/180;
+    const x=cx+rx*Math.cos(th),y=cy+ry*Math.sin(th),lx=x-w/2;
+    lines+=`<line x1="${cx}" y1="${cy}" x2="${x.toFixed(0)}" y2="${y.toFixed(0)}" stroke="#DADBE6" stroke-width="2"/>`;
+    nodes+=`<a href="${a.h}"><g class="hub-card">
+      <rect class="hub-rect" x="${lx.toFixed(0)}" y="${(y-h/2).toFixed(0)}" width="${w}" height="${h}" rx="15" fill="#fff" stroke="#E6E7EF"/>
+      <circle cx="${(lx+32).toFixed(0)}" cy="${y.toFixed(0)}" r="17" fill="${a.c}"/>
+      <text x="${(lx+32).toFixed(0)}" y="${(y+4).toFixed(0)}" text-anchor="middle" fill="#fff" font-size="12" font-weight="800">${a.s}</text>
+      <text x="${(lx+58).toFixed(0)}" y="${(y-5).toFixed(0)}" font-size="14.5" font-weight="700" fill="#1B1F2E">${a.n}</text>
+      <text x="${(lx+58).toFixed(0)}" y="${(y+15).toFixed(0)}" font-size="11.5" fill="#5D6374">${a.stat}</text>
+    </g></a>`;
+  });
+  const center=`<g>
+    <rect x="${cx-140}" y="${cy-54}" width="280" height="108" rx="20" fill="#5A4FB5"/>
+    <text x="${cx}" y="${cy-18}" text-anchor="middle" fill="#fff" font-size="20" font-weight="800">Product safety graph</text>
+    <text x="${cx}" y="${cy+7}" text-anchor="middle" fill="#CFC8F2" font-size="13">${PLAT.graph_nodes} nodes &middot; ${PLAT.graph_edges.toLocaleString("en-IN")} edges</text>
+    <text x="${cx}" y="${cy+30}" text-anchor="middle" fill="#CFC8F2" font-size="11.5">${PLAT.products} products &middot; ${PLAT.categories} categories &middot; 2 verticals</text>
+  </g>`;
+  $("#hub").innerHTML=lines+center+nodes;
+}
+function renderBizTiles(){
+  $("#bizTiles").innerHTML=`
+    <div class="tile"><div class="k">Fulfilling store</div><div class="v" style="font-size:16px">${PLAT.store_id}</div><div class="n">1 of 3 dark stores modeled</div></div>
+    <div class="tile bad"><div class="k">Out of stock here</div><div class="v">${PLAT.store_out_pct}%</div><div class="n">of catalog, right now</div></div>
+    <div class="tile"><div class="k">Avg margin</div><div class="v">${PLAT.avg_margin_pct}%</div><div class="n">across the catalog</div></div>
+    <div class="tile"><div class="k">Clearance SKUs</div><div class="v">${PLAT.clearance_skus}</div><div class="n">nudged when safe and in stock</div></div>`;
 }
 
 /* platform buttons */
@@ -196,31 +237,6 @@ $("#connectBtn").onclick=async()=>{
   drawGraph();
 };
 
-function sessionLog(){try{return JSON.parse(localStorage.getItem("swapiq")||"{}").log||[]}catch{return[]}}
-function renderTiles(){
-  const log=sessionLog(),acc=log.filter(d=>d.accepted).length,saved=log.reduce((s,d)=>s+(d.saved||0),0);
-  $("#tiles").innerHTML=`
-    <div class="tile"><div class="k">Catalog</div><div class="v">${PLAT.products}</div><div class="n">${PLAT.categories} categories, ${PLAT.graph_nodes} graph nodes &middot; ${PLAT.graph_backend}${PLAT.graph_persistent?" persistent":" fallback"}</div></div>
-    <div class="tile"><div class="k">Stockouts handled</div><div class="v">${log.length}</div><div class="n">this demo session</div></div>
-    <div class="tile"><div class="k">Revenue recovered</div><div class="v">Rs. ${saved.toLocaleString("en-IN")}</div><div class="n">${log.length?Math.round(acc/log.length*100):0}% acceptance</div></div>
-    <div class="tile"><div class="k">Listings flagged</div><div class="v">${PLAT.listings_with_issues}</div><div class="n">${PLAT.critical} critical</div></div>`;
-  $("#bizTiles").innerHTML=`
-    <div class="tile"><div class="k">Fulfilling store</div><div class="v" style="font-size:16px">${PLAT.store_id}</div><div class="n">1 of 3 dark stores modeled</div></div>
-    <div class="tile bad"><div class="k">Out of stock here</div><div class="v">${PLAT.store_out_pct}%</div><div class="n">of catalog, right now</div></div>
-    <div class="tile"><div class="k">Avg margin</div><div class="v">${PLAT.avg_margin_pct}%</div><div class="n">across the catalog</div></div>
-    <div class="tile"><div class="k">Clearance SKUs</div><div class="v">${PLAT.clearance_skus}</div><div class="n">nudged when safe and in stock</div></div>`;
-}
-function renderApps(){
-  const A=[
-    ["Substitution","SW","#5A4FB5","live","Safe swaps for stockouts","/","Store demo"],
-    ["Compliance QA","LI","#177A42","live","Audit every listing","/qa.html","Open"],
-    ["Recall","RC","#B3403A","live","One input to every SKU","#","Below"],
-    ["Safe Search","SS","#9A5B10","live","Filter to what's safe","/","In store"],
-    ["Returns & Exchange","RX","#0C831F","live","Return, learn, exchange safely","/","In store"],
-    ["Your next app","NX","#8A8FA3","soon","Same graph, new workflow","#","Roadmap"],
-  ];
-  $("#apps").innerHTML=A.map(a=>`<div class="app ${a[3]==="live"?"live":""}"><div class="top"><span class="ic" style="background:${a[2]}">${a[1]}</span><h3>${a[0]}</h3><span class="tag ${a[3]==="live"?"on":"soon"}">${a[3]}</span></div><p>${a[4]}</p><a class="go" href="${a[5]}">${a[6]} &rarr;</a></div>`).join("");
-}
 
 /* recall */
 const RECALL_ING=["almonds","cashews","peanuts","milk_solids","wheat_flour","soybeans","sesame_seeds","egg_whites"];
