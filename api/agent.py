@@ -10,6 +10,45 @@ import os
 
 MODEL = "claude-opus-4-8"
 
+# ---- LangSmith tracing (optional) -------------------------------------------
+# Observability for the single LLM call in SwapIQ. Turns itself on only when a
+# LangSmith API key is present, so local runs, the deterministic fallback, and
+# the deployed demo all behave identically with or without it. When on, each
+# substitution decision shows up as a trace: the rank_and_explain chain with the
+# Claude call nested inside, including which path (claude vs fallback) was used.
+_LANGSMITH_ON = bool(os.environ.get("LANGSMITH_API_KEY") or os.environ.get("LANGCHAIN_API_KEY"))
+if _LANGSMITH_ON:
+    os.environ.setdefault("LANGSMITH_TRACING", "true")
+    os.environ.setdefault("LANGSMITH_PROJECT", "swapiq")
+
+try:
+    from langsmith import traceable
+    from langsmith.wrappers import wrap_anthropic
+    _LS_CLIENT = None
+    if _LANGSMITH_ON:
+        from langsmith import Client
+        _LS_CLIENT = Client()
+except Exception:  # langsmith not installed -> no-op decorator, nothing changes
+    wrap_anthropic = None
+    _LS_CLIENT = None
+
+    def traceable(*d_args, **d_kwargs):
+        if d_args and callable(d_args[0]) and not d_kwargs:
+            return d_args[0]
+        def _wrap(fn):
+            return fn
+        return _wrap
+
+
+def _flush_traces():
+    """Flush before the serverless function returns; Vercel may freeze the
+    process between invocations, so we do not rely on the atexit handler."""
+    if _LS_CLIENT is not None:
+        try:
+            _LS_CLIENT.flush()
+        except Exception:
+            pass
+
 RANKING_SCHEMA = {
     "type": "object",
     "properties": {
@@ -59,14 +98,16 @@ def claude_available():
     return bool(get_api_key())
 
 
+@traceable(run_type="chain", name="swapiq.rank_and_explain", client=_LS_CLIENT)
 def rank_and_explain(oos_product, candidates, shopper, top_n=3):
     candidates = candidates[:6]
     result = _rank_with_claude(oos_product, candidates, shopper, top_n)
     if result:
         result["source"] = "claude"
-        return result
-    result = _rank_fallback(oos_product, candidates, shopper, top_n)
-    result["source"] = "fallback"
+    else:
+        result = _rank_fallback(oos_product, candidates, shopper, top_n)
+        result["source"] = "fallback"
+    _flush_traces()
     return result
 
 
@@ -77,6 +118,11 @@ def _rank_with_claude(oos_product, candidates, shopper, top_n):
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=key)
+        if wrap_anthropic is not None and _LANGSMITH_ON:
+            try:
+                client = wrap_anthropic(client)
+            except Exception:
+                pass
     except Exception:
         return None
 
