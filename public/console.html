@@ -36,8 +36,17 @@
   main{max-width:1120px;margin:0 auto;padding:26px 22px 60px}
   .hero{margin-bottom:22px}
   .hero .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
-  .hero h1{font-size:28px;letter-spacing:-.025em;margin:6px 0 6px;max-width:20ch}
-  .hero p{color:var(--soft);font-size:14.5px;max-width:64ch}
+  .hero h1{font-size:34px;letter-spacing:-.03em;margin:8px 0 8px;max-width:22ch;line-height:1.06}
+  .hero p{color:var(--soft);font-size:15px;max-width:66ch;line-height:1.55}
+  .hero-cta{display:flex;gap:11px;flex-wrap:wrap;margin-top:20px}
+  .btn-primary{border:none;background:var(--accent);color:#fff;border-radius:12px;padding:12px 22px;font-size:14px;font-weight:700;box-shadow:0 8px 22px rgba(90,79,181,.32),inset 0 1px 0 rgba(255,255,255,.25);transition:transform .15s,box-shadow .15s}
+  .btn-primary:hover{background:var(--accent-dark);transform:translateY(-1px);box-shadow:0 12px 28px rgba(90,79,181,.4)}
+  .btn-ghost{display:inline-flex;align-items:center;border:1px solid var(--glass-brd);background:var(--glass);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);color:var(--accent-dark);border-radius:12px;padding:12px 20px;font-size:14px;font-weight:700;text-decoration:none;box-shadow:var(--glass-spec)}
+  .btn-ghost:hover{background:var(--glass-2)}
+  .hero-stats{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+  .hero-stats .hs{flex:1;min-width:132px;background:var(--glass);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);border:1px solid var(--glass-brd);border-radius:14px;padding:13px 16px;box-shadow:var(--glass-spec)}
+  .hero-stats .hs b{display:block;font-size:23px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .hero-stats .hs span{font-size:11.5px;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
   .sec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin:26px 0 12px}
   .sec-note{text-transform:none;letter-spacing:0;font-weight:500;color:var(--faint);margin-left:8px;font-size:11.5px}
   .mini-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
@@ -104,7 +113,7 @@
   .rr .v{font-size:22px;font-weight:800;color:var(--red)}.rr .k{font-size:11px;color:#7C2D28;font-weight:600}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
   .chip{background:#fff;border:1px solid var(--line);border-radius:7px;padding:3px 9px;font-size:11.5px}
-  canvas{width:100%;border:1px solid var(--glass-brd);border-radius:14px;background:rgba(255,255,255,.45)}
+  canvas{width:100%;height:420px;display:block;border:1px solid var(--glass-brd);border-radius:14px;background:rgba(255,255,255,.45)}
   .legend{display:flex;gap:13px;font-size:11.5px;color:var(--soft);flex-wrap:wrap;margin:9px 0}
   .legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px}
   select.gsel{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;max-width:340px}
@@ -122,7 +131,12 @@
   <div class="hero">
     <div class="eyebrow">One graph. Every safety workflow.</div>
     <h1>The product safety graph for commerce</h1>
-    <p>Connect a catalog, the graph builds itself, and every app below runs on it.</p>
+    <p>Connect your catalog and the graph builds itself. Substitution, compliance QA, recall propagation and safe search all read from one safety layer, so every decision an ecommerce makes about a product is provable, not guessed.</p>
+    <div class="hero-cta">
+      <button class="btn-primary" id="heroConnect">Connect a store</button>
+      <a class="btn-ghost" href="/">Open the storefront &rarr;</a>
+    </div>
+    <div class="hero-stats" id="heroStats"></div>
   </div>
 
   <div class="hubwrap"><svg id="hub" viewBox="0 0 1000 560" role="img" aria-label="One graph, many apps"></svg></div>
@@ -181,7 +195,18 @@ let PLAT=null,DATA=null;
 async function boot(){
   PLAT=await(await fetch("/api/platform")).json();
   DATA=await(await fetch("/api/bootstrap")).json();
-  renderHub();renderBizTiles();renderRecallOptions();renderGraphSelect();
+  renderHub();renderHeroStats();renderBizTiles();renderRecallOptions();renderGraphSelect();drawGraph();
+  const hc=$("#heroConnect");if(hc)hc.onclick=()=>{const t=document.querySelector(".integ");if(t)t.scrollIntoView({behavior:"smooth",block:"center"})};
+}
+function renderHeroStats(){
+  const stats=[
+    {b:PLAT.graph_nodes.toLocaleString("en-IN"),s:"graph nodes"},
+    {b:PLAT.graph_edges.toLocaleString("en-IN"),s:"safety edges"},
+    {b:PLAT.products.toLocaleString("en-IN"),s:"products mapped"},
+    {b:"2",s:"verticals live"},
+    {b:"&lt;50ms",s:"per decision"},
+  ];
+  $("#heroStats").innerHTML=stats.map(x=>`<div class="hs"><b>${x.b}</b><span>${x.s}</span></div>`).join("");
 }
 function renderHub(){
   const cx=500,cy=280,rx=350,ry=178,w=200,h=72;
@@ -216,7 +241,7 @@ function renderHub(){
 }
 function renderBizTiles(){
   $("#bizTiles").innerHTML=`
-    <div class="tile"><div class="k">Fulfilling location</div><div class="v" style="font-size:16px">${PLAT.store_id}</div><div class="n">1 of 3 fulfilment centers modeled</div></div>
+    <div class="tile"><div class="k">Fulfilling location</div><div class="v" style="font-size:16px">Center ${(String(PLAT.store_id).match(/\d+/)||["12"])[0]}</div><div class="n">1 of 3 fulfilment centers modeled</div></div>
     <div class="tile bad"><div class="k">Out of stock here</div><div class="v">${PLAT.store_out_pct}%</div><div class="n">of catalog, right now</div></div>
     <div class="tile"><div class="k">Avg margin</div><div class="v">${PLAT.avg_margin_pct}%</div><div class="n">across the catalog</div></div>
     <div class="tile"><div class="k">Clearance SKUs</div><div class="v">${PLAT.clearance_skus}</div><div class="n">nudged when safe and in stock</div></div>`;
